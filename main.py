@@ -2,12 +2,11 @@
 Zaza Assistant — Main Loop
 
 Flow:
-  1. Sit idle listening for the wake word (OpenWakeWord — "Hey Jarvis")
-  2. Once heard, record a short command
-  3. Transcribe it with Whisper, send to the local LLM with tool definitions
-  4. LLM either calls a tool (open app, get time, etc.) or replies directly
-  5. Speak the result back
-  6. Loop
+  1. Startup: check mic, greet user (references past sessions if any)
+  2. Listen for wake word ("Hey Jarvis" via OpenWakeWord)
+  3. Enter conversation mode — keep talking without wake word
+  4. After 30 seconds of silence, go back to listening for wake word
+  5. "Stop" / "exit" shuts down entirely
 
 Run: python main.py
 Type-only mode (no mic): python main.py --text
@@ -17,11 +16,13 @@ import sys
 import os
 import atexit
 import traceback
+import time as _time
+from datetime import datetime
 
 import numpy as np
 import sounddevice as sd
 
-from config import ASSISTANT_NAME, WAKE_MODEL, BASE_DIR, SAMPLE_RATE
+from config import ASSISTANT_NAME, WAKE_MODEL, BASE_DIR, SAMPLE_RATE, CONVERSATION_TIMEOUT
 from text_to_speech import speak
 from llm_brain import think
 
@@ -34,6 +35,14 @@ if getattr(sys, "frozen", False):
     sys.stdout = log_file
     sys.stderr = log_file
     atexit.register(log_file.close)
+
+
+# Words that exit the assistant completely
+EXIT_WORDS = {"stop", "exit", "shut down", "goodbye", "quit"}
+
+# Words that end the conversation but keep listening for wake word
+END_CONVERSATION_WORDS = {"nevermind", "never mind", "that's all", "thanks",
+                          "thank you", "bye", "i'm done", "that will be all"}
 
 
 def _check_mic():
@@ -49,7 +58,7 @@ def _check_mic():
         avg = int(np.abs(audio).mean())
 
         if peak < 50:
-            print("  WARNING: Mic seems silent (peak={peak}). Check Windows mic permissions.")
+            print(f"  WARNING: Mic seems silent (peak={peak}). Check Windows mic permissions.")
             print("  Settings > Privacy > Microphone > make sure it's ON")
             speak("Warning: your microphone seems silent. Check Windows mic permissions.")
         else:
@@ -58,6 +67,38 @@ def _check_mic():
     except Exception as e:
         print(f"  Mic check failed: {e}")
         speak("I couldn't access your microphone. Check that it's plugged in and enabled.")
+
+
+def _startup_greeting():
+    """Smart greeting based on time of day and conversation history."""
+    from memory import get_last_session_info
+
+    hour = datetime.now().hour
+    if hour < 12:
+        greeting = "Good morning"
+    elif hour < 17:
+        greeting = "Good afternoon"
+    else:
+        greeting = "Good evening"
+
+    wake_display = WAKE_MODEL.replace("_", " ").title()
+    session = get_last_session_info()
+
+    if session and session.get("timestamp"):
+        last_dt = session["timestamp"]
+        now = datetime.now()
+        delta = now - last_dt
+
+        if delta.total_seconds() < 3600:
+            speak(f"I'm back! Say '{wake_display}' when you need me.")
+        elif delta.days == 0:
+            speak(f"{greeting}! {ASSISTANT_NAME} is online again. Say '{wake_display}' when you need me.")
+        elif delta.days == 1:
+            speak(f"{greeting}! Haven't talked since yesterday. Say '{wake_display}' and I'm all yours.")
+        else:
+            speak(f"{greeting}! It's been a while — {ASSISTANT_NAME} is back online. Say '{wake_display}' to get started.")
+    else:
+        speak(f"{greeting}! I'm {ASSISTANT_NAME}, your assistant. Say '{wake_display}' to get started.")
 
 
 def run_voice_mode():
@@ -69,26 +110,50 @@ def run_voice_mode():
         start_tray_in_background()
 
     _check_mic()
+    _startup_greeting()
 
-    wake_display = WAKE_MODEL.replace("_", " ").title()
-    speak(f"{ASSISTANT_NAME} is online. Say '{wake_display}' to activate.")
     while True:
         try:
+            # ── Phase 1: Wait for wake word ──
             listen_for_wake_word()
             speak("Yes?")
-            command = listen_for_command()
-            print(f"You said: {command}")
 
-            if not command:
-                speak("I didn't catch that.")
-                continue
+            # ── Phase 2: Conversation mode ──
+            # Stay in conversation — no wake word needed between commands.
+            # Only returns to wake-word listening after CONVERSATION_TIMEOUT
+            # seconds of silence, or if the user explicitly ends it.
+            last_activity = _time.time()
 
-            if command.lower() in ("stop", "exit", "shut down", "goodbye"):
-                speak("Going offline. Later.")
-                break
+            while True:
+                command = listen_for_command()
 
-            reply = think(command)
-            speak(reply)
+                if not command:
+                    # No speech detected in this window — check timeout
+                    elapsed = _time.time() - last_activity
+                    if elapsed >= CONVERSATION_TIMEOUT:
+                        speak("I'll be here when you need me.")
+                        break  # Back to wake word listening
+                    # Otherwise keep listening silently
+                    continue
+
+                last_activity = _time.time()
+                print(f"You said: {command}")
+
+                lower = command.lower().strip()
+
+                # Check for full shutdown
+                if lower in EXIT_WORDS:
+                    speak("Going offline. Later.")
+                    return  # Exit the assistant entirely
+
+                # Check for conversation end (back to wake word)
+                if lower in END_CONVERSATION_WORDS:
+                    speak("Alright, I'm here if you need me.")
+                    break  # Back to wake word listening
+
+                # Process the command
+                reply = think(command)
+                speak(reply)
 
         except SystemExit:
             speak("Going offline. Later.")
@@ -103,8 +168,11 @@ def run_voice_mode():
 
 def run_text_mode():
     """Fallback mode — type commands instead of speaking them.
-    Useful for testing without a mic, or if audio isn't set up yet."""
+    Useful for testing without a mic, or if audio isn't set up yet.
+    Text mode ALSO speaks replies aloud so you can hear the TTS."""
+    _startup_greeting()
     print(f"{ASSISTANT_NAME} (text mode). Type 'exit' to quit.")
+    print("Conversation mode is always active in text mode — just keep typing.\n")
     while True:
         try:
             command = input("You: ").strip()
@@ -114,12 +182,13 @@ def run_text_mode():
 
         if not command:
             continue
-        if command.lower() in ("stop", "exit", "quit", "shut down", "goodbye"):
-            print(f"{ASSISTANT_NAME}: Later.")
+        if command.lower() in EXIT_WORDS:
+            speak("Later.")
             break
 
         reply = think(command)
         print(f"{ASSISTANT_NAME}: {reply}")
+        speak(reply)  # Also speak it aloud!
 
 
 if __name__ == "__main__":

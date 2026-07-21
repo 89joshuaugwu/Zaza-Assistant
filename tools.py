@@ -298,6 +298,56 @@ def take_screenshot(_args=None):
         return "Couldn't take a screenshot."
 
 
+def type_text(args: dict):
+    """Types text into the currently focused window (or opens an app first).
+    Uses clipboard paste for reliability — works with any characters."""
+    text = (args or {}).get("text", "").strip()
+    if not text:
+        return "What should I type?"
+
+    app_name = (args or {}).get("app_name", "").strip().lower()
+    if app_name:
+        # Open the app first, then wait for it to focus
+        open_application({"app_name": app_name})
+        import time
+        time.sleep(2)
+
+    try:
+        import pyperclip
+        import time
+
+        # Save current clipboard, paste our text, then restore
+        old_clipboard = ""
+        try:
+            old_clipboard = pyperclip.paste()
+        except Exception:
+            pass
+
+        pyperclip.copy(text)
+        time.sleep(0.1)
+
+        # Simulate Ctrl+V via Windows keybd_event
+        VK_CONTROL = 0x11
+        VK_V = 0x56
+        KEYEVENTF_KEYUP = 0x0002
+
+        ctypes.windll.user32.keybd_event(VK_CONTROL, 0, 0, 0)
+        ctypes.windll.user32.keybd_event(VK_V, 0, 0, 0)
+        time.sleep(0.05)
+        ctypes.windll.user32.keybd_event(VK_V, 0, KEYEVENTF_KEYUP, 0)
+        ctypes.windll.user32.keybd_event(VK_CONTROL, 0, KEYEVENTF_KEYUP, 0)
+
+        time.sleep(0.3)
+        try:
+            pyperclip.copy(old_clipboard)  # restore clipboard
+        except Exception:
+            pass
+
+        return "Done — typed the text."
+    except Exception:
+        return "Couldn't type the text. Make sure the target window is focused."
+
+
 # ── Registry: maps tool name -> (function, JSON schema for the LLM) ──
 
 TOOLS = {
@@ -421,6 +471,18 @@ TOOLS = {
         "func": take_screenshot,
         "description": "Take a screenshot of the entire screen and save it to the desktop.",
         "parameters": {"type": "object", "properties": {}, "required": []},
+    },
+    "type_text": {
+        "func": type_text,
+        "description": "Type text into the currently focused application window. Can optionally open an app first (e.g. notepad) then type into it. Use this when the user says 'write ... in notepad', 'type ... in word', etc.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "text": {"type": "string", "description": "The text to type"},
+                "app_name": {"type": "string", "description": "Optional: app to open first before typing (e.g. notepad, word)"},
+            },
+            "required": ["text"],
+        },
     },
 }
 

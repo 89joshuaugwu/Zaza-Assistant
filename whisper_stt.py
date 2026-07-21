@@ -11,6 +11,7 @@ Face — needs internet once. After that, fully offline and cached.
 
 import numpy as np
 import sounddevice as sd
+import time as _time
 from faster_whisper import WhisperModel
 
 from config import (
@@ -31,10 +32,23 @@ def _get_command_model():
     return _command_model
 
 
+_cached_threshold = None
+_cached_threshold_time = 0
+
+
 def _calibrate_silence(duration=0.5):
     """Record a short silence sample and measure the ambient noise floor.
     Returns a threshold slightly above the ambient level so silence
-    detection adapts to whatever mic + room combo the user has."""
+    detection adapts to whatever mic + room combo the user has.
+
+    Caches the result for 60 seconds to avoid recalibrating on every
+    command during conversation mode."""
+    global _cached_threshold, _cached_threshold_time
+
+    # Reuse cached value if less than 60 seconds old
+    if _cached_threshold is not None and (_time.time() - _cached_threshold_time) < 60:
+        return _cached_threshold
+
     try:
         audio = sd.rec(
             int(SAMPLE_RATE * duration), samplerate=SAMPLE_RATE,
@@ -45,6 +59,8 @@ def _calibrate_silence(duration=0.5):
         # Set threshold at 3x ambient noise — generous margin above the floor
         threshold = max(int(ambient * 3), 200)  # minimum 200 to avoid over-sensitivity
         print(f"  Ambient noise: {ambient:.0f}, silence threshold set to: {threshold}")
+        _cached_threshold = threshold
+        _cached_threshold_time = _time.time()
         return threshold
     except Exception:
         return SILENCE_THRESHOLD  # fallback to config value

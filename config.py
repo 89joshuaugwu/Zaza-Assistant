@@ -48,6 +48,18 @@ MAX_COMMAND_SECONDS = 8           # hard cap so it never listens forever
 SILENCE_THRESHOLD = 500           # fallback — auto-calibrated on startup from ambient noise
 SILENCE_DURATION = 1.2            # seconds of quiet before it decides you're done talking
 
+# ── Conversation mode ─────────────────────────────────────
+# After the wake word fires, the assistant stays in conversation mode —
+# you can keep talking without saying the wake word again. It only goes
+# back to listening for the wake word after this many seconds of silence.
+CONVERSATION_TIMEOUT = 30         # seconds of silence before ending conversation
+
+# ── Persistent memory ─────────────────────────────────────
+# Conversation history is saved locally so the assistant remembers past
+# sessions. Fully offline — just a JSON file on your disk.
+MEMORY_DIR = os.path.join(BASE_DIR, "memory")
+MAX_HISTORY = 50                  # keep this many past interactions
+
 # ── Text-to-Speech ────────────────────────────────────────
 TTS_RATE = 175                    # words per minute
 TTS_VOLUME = 1.0
