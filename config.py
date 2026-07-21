@@ -15,8 +15,8 @@ else:
     BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 # ── Identity ──────────────────────────────────────────────
-ASSISTANT_NAME = "Zaza"          # what you call it
-WAKE_WORD = "hey zaza"           # phrase that activates listening (lowercase, no punctuation)
+ASSISTANT_NAME = "Josh"          # what you call it
+WAKE_WORD = "josh"           # phrase that activates listening (lowercase, no punctuation)
 
 # ── Ollama (local LLM) ────────────────────────────────────
 OLLAMA_URL = "http://localhost:11434/api/chat"
