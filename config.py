@@ -51,14 +51,14 @@ OLLAMA_MODEL = "qwen2.5:3b"      # good balance of speed + tool-calling accuracy
 #               Works with ANY phrase you want (e.g. "hey josh").
 #               Slightly more CPU (~5-10% during speech).
 #
-WAKE_MODE = "custom"              # "model" or "custom" — flip to switch!
+WAKE_MODE = "model"              # "model" or "custom" — flip to switch!
 
 # Model mode settings (used when WAKE_MODE = "model")
 WAKE_MODEL = "hey_jarvis"         # options: hey_jarvis, alexa, hey_mycroft
 WAKE_THRESHOLD = 0.5              # confidence 0.0–1.0 (raise to reduce false triggers)
 
 # Custom mode settings (used when WAKE_MODE = "custom")
-WAKE_WORD = "hey josh"            # say literally anything you want
+WAKE_WORD = "josh"            # say literally anything you want
 
 # ── Command transcription (Whisper) ────────────────────────
 # After the wake word fires, Whisper transcribes your actual command.
