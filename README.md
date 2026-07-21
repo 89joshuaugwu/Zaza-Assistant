@@ -8,8 +8,8 @@ reads the result back. Everything runs 100% on your machine.
 
 **Pipeline:**
 Wake word detection (OpenWakeWord) → command transcription (faster-whisper)
-→ local LLM decides which tool to call (Ollama + Qwen2.5:3b) → action
-executes → text-to-speech reads the result back (pyttsx3).
+→ local LLM decides which tool to call (Ollama + Qwen2.5:3b) → streams response word-by-word
+→ text-to-speech reads the result back in real-time using a dedicated background queue (pyttsx3).
 
 Total disk footprint: ~3-5GB (Ollama model + Whisper base.en + OpenWakeWord).
 
@@ -131,7 +131,7 @@ WHISPER_MODEL_SIZE = "base.en"   # tiny.en = fastest, small.en = most accurate
 **Adjust how long it waits for you to finish talking** → `config.py`:
 ```python
 MAX_COMMAND_SECONDS = 8     # hard cap, in case silence detection fails
-SILENCE_DURATION = 1.2      # seconds of quiet before it decides you're done
+SILENCE_DURATION = 0.8      # seconds of quiet before it decides you're done
 ```
 
 **Change TTS voice** → `config.py`:
@@ -241,13 +241,40 @@ don't need to re-register it.
 | Clipboard | "what's in my clipboard", "what did I copy" |
 | Reminder | "remind me in 10 minutes to check the oven" |
 | Screenshot | "take a screenshot" |
+| Type text | "type hello world", "write a note in notepad" |
+| Lock screen | "lock my computer", "lock screen" |
+| Power controls | "shutdown my PC", "restart", "put my PC to sleep" |
+| List running apps | "what apps are running", "what's open" |
+| Minimize windows | "show desktop", "minimize everything" |
+| Read file | "read me [file path]", "what's in [file path]" |
+| Create file | "create a file called notes", "make a note called todo" |
+| Uptime | "how long has my PC been running" |
+| Recycle Bin | "empty the trash", "clear the recycle bin" |
 
 The assistant also remembers the last 5 exchanges, so follow-up commands
 like "open the first one" after a file search work.
 
 ---
 
-## 9. Performance notes for your specs (16GB RAM, 512GB SSD)
+## 9. Security & PIN Verification
+
+If certain actions are too sensitive (e.g., shutting down the PC or emptying the trash), you can protect them with a voice PIN.
+1. Set `SECURITY_PIN = 1234` in `config.py`.
+2. Add the tool names to the `PROTECTED_TOOLS` list.
+3. When requested, the assistant will pause and ask you to speak your PIN (e.g. "one two three four") before executing the action.
+
+---
+
+## 10. Testing & Diagnostics
+
+The project currently uses manual end-to-end testing rather than automated suites like `pytest`.
+- **Voice Test:** Run `python main.py`
+- **Text-Only Test:** Run `python main.py --text` (bypasses microphone, great for testing LLM logic)
+- **Microphone Diagnostics:** Run `python diagnose_mic.py` if the wake word isn't triggering to calibrate your ambient noise and test audio thresholds.
+
+---
+
+## 11. Performance notes for your specs (16GB RAM, 512GB SSD)
 
 - `qwen2.5:3b` quantized sits around 2GB in RAM while loaded — no strain
 - OpenWakeWord uses ~1-3% CPU for wake word detection (much less than the
