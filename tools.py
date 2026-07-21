@@ -15,7 +15,7 @@ import ctypes
 
 import psutil
 
-from config import APP_PATHS, FOLDER_PATHS, BASE_DIR
+from config import APP_PATHS, FOLDER_PATHS, BASE_DIR, SECURITY_PIN, PROTECTED_TOOLS
 
 
 # ── Existing tools (with bug fixes) ──────────────────────
@@ -348,6 +348,153 @@ def type_text(args: dict):
         return "Couldn't type the text. Make sure the target window is focused."
 
 
+def lock_screen(_args=None):
+    """Locks the Windows workstation."""
+    try:
+        ctypes.windll.user32.LockWorkStation()
+        return "Locking your screen now."
+    except Exception:
+        return "Couldn't lock the screen."
+
+
+def system_power(args: dict):
+    """args: {'action': str} — shutdown, restart, sleep, or cancel."""
+    action = (args or {}).get("action", "").strip().lower()
+
+    if action in ("shutdown", "shut down", "power off"):
+        subprocess.Popen(["shutdown", "/s", "/t", "60"])
+        return "Shutting down in 60 seconds. Say 'cancel shutdown' to stop."
+    elif action in ("restart", "reboot"):
+        subprocess.Popen(["shutdown", "/r", "/t", "60"])
+        return "Restarting in 60 seconds. Say 'cancel shutdown' to stop."
+    elif action == "sleep":
+        subprocess.Popen(["rundll32.exe", "powrprof.dll,SetSuspendState", "0", "1", "0"])
+        return "Putting your PC to sleep."
+    elif action in ("cancel", "cancel shutdown", "abort"):
+        subprocess.Popen(["shutdown", "/a"])
+        return "Shutdown cancelled."
+    else:
+        return "I can shutdown, restart, sleep, or cancel a pending shutdown."
+
+
+def list_running_apps(_args=None):
+    """Lists the most notable running applications."""
+    try:
+        # Get unique process names, filter out system processes
+        system_procs = {"svchost", "csrss", "wininit", "services", "lsass",
+                        "smss", "dwm", "conhost", "dllhost", "sihost",
+                        "fontdrvhost", "winlogon", "logonui", "system",
+                        "registry", "idle", "runtimebroker", "searchhost",
+                        "startmenuexperiencehost", "shellexperiencehost",
+                        "textinputhost", "taskhostw", "ctfmon", "audiodg"}
+        apps = set()
+        for proc in psutil.process_iter(["name"]):
+            name = proc.info["name"]
+            if name:
+                base = name.lower().replace(".exe", "")
+                if base not in system_procs and not base.startswith("svchost"):
+                    apps.add(name.replace(".exe", ""))
+        if not apps:
+            return "No notable apps running."
+        # Sort and limit
+        app_list = sorted(apps)[:15]
+        return f"Running apps: {', '.join(app_list)}"
+    except Exception:
+        return "Couldn't list running apps."
+
+
+def minimize_all_windows(_args=None):
+    """Minimizes all windows (show desktop)."""
+    try:
+        # Simulate Win+D (show desktop)
+        VK_LWIN = 0x5B
+        VK_D = 0x44
+        KEYEVENTF_KEYUP = 0x0002
+        ctypes.windll.user32.keybd_event(VK_LWIN, 0, 0, 0)
+        ctypes.windll.user32.keybd_event(VK_D, 0, 0, 0)
+        import time
+        time.sleep(0.05)
+        ctypes.windll.user32.keybd_event(VK_D, 0, KEYEVENTF_KEYUP, 0)
+        ctypes.windll.user32.keybd_event(VK_LWIN, 0, KEYEVENTF_KEYUP, 0)
+        return "Done — showing the desktop."
+    except Exception:
+        return "Couldn't minimize windows."
+
+
+def read_file_contents(args: dict):
+    """args: {'file_path': str} — reads and speaks the contents of a text file."""
+    file_path = (args or {}).get("file_path", "").strip()
+    if not file_path:
+        return "Which file should I read?"
+    if not os.path.isfile(file_path):
+        return "I can't find that file."
+    try:
+        with open(file_path, "r", encoding="utf-8", errors="replace") as f:
+            content = f.read(2000)  # limit to 2000 chars for TTS
+        if not content.strip():
+            return "The file is empty."
+        if len(content) >= 2000:
+            return f"Here's the beginning of the file: {content}... (file is longer, I read the first 2000 characters)"
+        return f"Here's what the file says: {content}"
+    except Exception:
+        return "Couldn't read that file. It might not be a text file."
+
+
+def create_text_file(args: dict):
+    """args: {'filename': str, 'content': str, 'directory': str (optional)}"""
+    filename = (args or {}).get("filename", "").strip()
+    content = (args or {}).get("content", "").strip()
+    directory = (args or {}).get("directory", "").strip()
+
+    if not filename:
+        return "What should I name the file?"
+    if not content:
+        return "What should I write in the file?"
+
+    # Default to desktop
+    if not directory:
+        directory = FOLDER_PATHS.get(
+            "desktop", os.path.join(os.path.expanduser("~"), "Desktop")
+        )
+
+    # Add .txt if no extension
+    if "." not in filename:
+        filename += ".txt"
+
+    path = os.path.join(directory, filename)
+    try:
+        with open(path, "w", encoding="utf-8") as f:
+            f.write(content)
+        return f"Created {filename} on your desktop."
+    except Exception:
+        return f"Couldn't create the file."
+
+
+def get_system_uptime(_args=None):
+    """Returns how long the PC has been running."""
+    try:
+        boot_time = datetime.datetime.fromtimestamp(psutil.boot_time())
+        uptime = datetime.datetime.now() - boot_time
+        hours, remainder = divmod(int(uptime.total_seconds()), 3600)
+        minutes = remainder // 60
+        if hours > 0:
+            return f"Your PC has been on for {hours} hours and {minutes} minutes."
+        return f"Your PC has been on for {minutes} minutes."
+    except Exception:
+        return "Couldn't determine uptime."
+
+
+def empty_recycle_bin(_args=None):
+    """Empties the Windows recycle bin."""
+    try:
+        # SHEmptyRecycleBin(hwnd, path, flags)
+        # flags: 0x07 = SHERB_NOCONFIRMATION | SHERB_NOPROGRESSUI | SHERB_NOSOUND
+        ctypes.windll.shell32.SHEmptyRecycleBinW(None, None, 0x07)
+        return "Recycle bin emptied."
+    except Exception:
+        return "Couldn't empty the recycle bin."
+
+
 # ── Registry: maps tool name -> (function, JSON schema for the LLM) ──
 
 TOOLS = {
@@ -484,6 +631,66 @@ TOOLS = {
             "required": ["text"],
         },
     },
+    "lock_screen": {
+        "func": lock_screen,
+        "description": "Lock the Windows screen. Use when the user says 'lock my computer', 'lock screen', 'lock my PC'.",
+        "parameters": {"type": "object", "properties": {}, "required": []},
+    },
+    "system_power": {
+        "func": system_power,
+        "description": "Shutdown, restart, sleep the PC, or cancel a pending shutdown. Shutdown/restart have a 60-second delay so the user can cancel.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "action": {"type": "string", "description": "One of: shutdown, restart, sleep, cancel"},
+            },
+            "required": ["action"],
+        },
+    },
+    "list_running_apps": {
+        "func": list_running_apps,
+        "description": "List notable running applications (filters out system processes). Use when the user asks 'what apps are running', 'what's open', etc.",
+        "parameters": {"type": "object", "properties": {}, "required": []},
+    },
+    "minimize_all_windows": {
+        "func": minimize_all_windows,
+        "description": "Minimize all windows and show the desktop. Use for 'show desktop', 'minimize everything', 'clear my screen'.",
+        "parameters": {"type": "object", "properties": {}, "required": []},
+    },
+    "read_file_contents": {
+        "func": read_file_contents,
+        "description": "Read and speak the contents of a text file. Use when the user says 'read me [file]', 'what's in [file]', etc.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "file_path": {"type": "string", "description": "Full path to the text file to read"},
+            },
+            "required": ["file_path"],
+        },
+    },
+    "create_text_file": {
+        "func": create_text_file,
+        "description": "Create a new text file with content. Defaults to saving on the desktop. Use for 'create a file called X with Y', 'make a note called X'.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "filename": {"type": "string", "description": "Name for the file (e.g. 'notes', 'todo')"},
+                "content": {"type": "string", "description": "Text content to write in the file"},
+                "directory": {"type": "string", "description": "Optional: directory to save in (defaults to desktop)"},
+            },
+            "required": ["filename", "content"],
+        },
+    },
+    "get_system_uptime": {
+        "func": get_system_uptime,
+        "description": "Check how long the PC has been running since last boot.",
+        "parameters": {"type": "object", "properties": {}, "required": []},
+    },
+    "empty_recycle_bin": {
+        "func": empty_recycle_bin,
+        "description": "Empty the Windows recycle bin permanently. Use when the user says 'empty the trash', 'clear recycle bin'.",
+        "parameters": {"type": "object", "properties": {}, "required": []},
+    },
 }
 
 
@@ -505,4 +712,149 @@ def get_ollama_tool_schema():
 def execute_tool(name: str, args: dict):
     if name not in TOOLS:
         return f"Unknown tool: {name}"
+
+    # Check if this tool requires PIN verification
+    if SECURITY_PIN is not None and name in PROTECTED_TOOLS:
+        verified = _verify_pin()
+        if not verified:
+            return "Access denied. PIN verification failed."
+
     return TOOLS[name]["func"](args)
+
+
+# ── Voice PIN verification ────────────────────────────────
+
+def _parse_spoken_number(text: str):
+    """Parse a number from Whisper transcription of spoken digits.
+
+    Handles:
+      - Raw digits: "742" → 742
+      - Digit words: "seven four two" → 742
+      - Full words: "seven hundred forty two" → 742
+      - Mixed: "7 hundred 42" → 742
+    """
+    if not text:
+        return None
+
+    text = text.lower().strip().rstrip(".!?,")
+
+    # 1) Try direct integer parse
+    try:
+        return int(text)
+    except ValueError:
+        pass
+
+    # 2) Try extracting all digit characters
+    digits_only = "".join(c for c in text if c.isdigit())
+    if digits_only:
+        try:
+            return int(digits_only)
+        except ValueError:
+            pass
+
+    words = text.replace("-", " ").replace(",", " ").split()
+    # Remove filler words
+    words = [w for w in words if w not in ("and", "the", "a", "is", "my", "pin")]
+
+    # 3) Full word-to-number FIRST (for "seven hundred forty two" → 742)
+    #    This must run before digit-by-digit to avoid "seven" + "two" → 72
+    ones = {
+        "zero": 0, "one": 1, "two": 2, "three": 3, "four": 4,
+        "five": 5, "six": 6, "seven": 7, "eight": 8, "nine": 9,
+        "ten": 10, "eleven": 11, "twelve": 12, "thirteen": 13,
+        "fourteen": 14, "fifteen": 15, "sixteen": 16, "seventeen": 17,
+        "eighteen": 18, "nineteen": 19,
+    }
+    tens = {
+        "twenty": 20, "thirty": 30, "forty": 40, "fifty": 50,
+        "sixty": 60, "seventy": 70, "eighty": 80, "ninety": 90,
+    }
+
+    result = 0
+    current = 0
+    found_any = False
+    has_multiplier = any(w in ("hundred", "thousand") for w in words)
+    has_tens = any(w in tens for w in words)
+
+    for w in words:
+        if w in ones:
+            current += ones[w]
+            found_any = True
+        elif w in tens:
+            current += tens[w]
+            found_any = True
+        elif w == "hundred":
+            if current == 0:
+                current = 1
+            current *= 100
+            found_any = True
+        elif w == "thousand":
+            if current == 0:
+                current = 1
+            current *= 1000
+            result += current
+            current = 0
+            found_any = True
+
+    if found_any and (has_multiplier or has_tens):
+        return result + current
+
+    # 4) Digit-by-digit fallback (for "seven four two" → 742)
+    word_to_digit = {
+        "zero": "0", "oh": "0", "o": "0",
+        "one": "1", "two": "2", "to": "2", "too": "2",
+        "three": "3", "four": "4", "for": "4",
+        "five": "5", "six": "6", "seven": "7",
+        "eight": "8", "nine": "9",
+    }
+
+    digit_str = ""
+    for w in words:
+        if w in word_to_digit:
+            digit_str += word_to_digit[w]
+    if digit_str:
+        try:
+            return int(digit_str)
+        except ValueError:
+            pass
+
+    # 5) If full word found something without multiplier (single word like "fifty")
+    if found_any:
+        return result + current
+
+    return None
+
+
+def _verify_pin() -> bool:
+    """Ask the user to speak their PIN and verify it.
+    Gives 2 attempts before denying access."""
+    from text_to_speech import speak
+    from whisper_stt import listen_for_command
+
+    for attempt in range(2):
+        if attempt == 0:
+            speak("This action requires admin access. What's your security PIN?")
+        else:
+            speak("Wrong PIN. Try once more.")
+
+        spoken = listen_for_command()
+        print(f"  PIN attempt {attempt + 1}: heard '{spoken}'")
+
+        if not spoken:
+            speak("I didn't hear anything.")
+            continue
+
+        # Check for cancel
+        if spoken.lower().strip() in ("cancel", "never mind", "nevermind", "stop", "forget it"):
+            speak("Cancelled.")
+            return False
+
+        parsed = _parse_spoken_number(spoken)
+        print(f"  Parsed number: {parsed}")
+
+        if parsed is not None and parsed == SECURITY_PIN:
+            speak("Verified.")
+            return True
+
+    speak("Access denied.")
+    return False

@@ -16,27 +16,45 @@ else:
 
 # ── Identity ──────────────────────────────────────────────
 ASSISTANT_NAME = "Josh"           # what the assistant calls itself
-# The wake word you actually *say* is determined by WAKE_MODEL below
-# (e.g. "Hey Jarvis"). The assistant name is just for display/speech.
+
+# ── Security (voice PIN) ──────────────────────────────────
+# Set a numeric PIN (0–1000) to protect sensitive tools.
+# When you try to use a protected tool (e.g. shutdown, lock screen),
+# the assistant will ask you to speak your PIN before executing.
+#
+# Set to None to disable (all tools run without PIN).
+# Change the number to your own secret PIN:
+SECURITY_PIN = 2002               # e.g. 742 — set your own number here!
+
+# Which tools require PIN verification before executing:
+PROTECTED_TOOLS = {
+    "lock_screen",
+    "system_power",
+    "empty_recycle_bin",
+    "create_text_file",
+}
+# Add or remove tool names from this set to customize what's protected.
 
 # ── Ollama (local LLM) ────────────────────────────────────
 OLLAMA_URL = "http://localhost:11434/api/chat"
 OLLAMA_MODEL = "qwen2.5:3b"      # good balance of speed + tool-calling accuracy on 16GB RAM
                                   # alt: "llama3.2:3b" if qwen misbehaves
 
-# ── Wake Word Detection (OpenWakeWord) ─────────────────────
-# Purpose-built neural wake word engine — much more accurate and lighter
-# on CPU than the old Whisper-polling approach. Streams audio continuously
-# in 80ms chunks with zero gaps.
+# ── Wake Word Detection (dual-mode) ────────────────────────
+# Set WAKE_WORD to whatever phrase you want to say to activate the assistant.
 #
-# Available pre-trained models (just change the value below):
-#   "hey_jarvis"   — say "Hey Jarvis"   (recommended, most reliable)
-#   "alexa"        — say "Alexa"
-#   "hey_mycroft"  — say "Hey Mycroft"
+# If it matches a pre-trained OpenWakeWord model, that's used automatically
+# (fastest, lowest CPU). Otherwise, Whisper streaming handles it — works
+# with ANY phrase, including names like "hey josh".
 #
-# First run downloads the model (~few MB) — needs internet once.
-WAKE_MODEL = "hey_jarvis"         # pre-trained model name
-WAKE_THRESHOLD = 0.5              # confidence (0.0–1.0); raise if you get false triggers
+# Pre-trained options (best accuracy, ~1% CPU):
+#   "hey jarvis", "alexa", "hey mycroft"
+#
+# Custom (any phrase, ~5-10% CPU during speech):
+#   "hey josh", "hey computer", "yo buddy", literally anything
+#
+WAKE_WORD = "hey josh"            # say this to activate the assistant
+WAKE_THRESHOLD = 0.5              # only used for pre-trained models (0.0–1.0)
 
 # ── Command transcription (Whisper) ────────────────────────
 # After the wake word fires, Whisper transcribes your actual command.
