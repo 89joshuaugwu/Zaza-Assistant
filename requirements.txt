@@ -1,0 +1,8 @@
+requests
+vosk
+sounddevice
+pyttsx3
+psutil
+pyinstaller
+pystray
+pillow
