@@ -828,7 +828,7 @@ def _parse_spoken_number(text: str):
 def _verify_pin() -> bool:
     """Ask the user to speak their PIN and verify it.
     Gives 2 attempts before denying access."""
-    from text_to_speech import speak
+    from text_to_speech import speak, wait_until_done
     from whisper_stt import listen_for_command
 
     for attempt in range(2):
@@ -837,6 +837,8 @@ def _verify_pin() -> bool:
         else:
             speak("Wrong PIN. Try once more.")
 
+        wait_until_done()
+        
         spoken = listen_for_command()
         print(f"  PIN attempt {attempt + 1}: heard '{spoken}'")
 

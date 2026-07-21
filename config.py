@@ -58,13 +58,13 @@ WAKE_MODEL = "hey_jarvis"         # options: hey_jarvis, alexa, hey_mycroft
 WAKE_THRESHOLD = 0.5              # confidence 0.0–1.0 (raise to reduce false triggers)
 
 # Custom mode settings (used when WAKE_MODE = "custom")
-WAKE_WORD = "josh"            # say literally anything you want
+WAKE_WORD = "jarvis"            # say literally anything you want
 
 # ── Command transcription (Whisper) ────────────────────────
 # After the wake word fires, Whisper transcribes your actual command.
 # This is where accuracy matters most.
 SAMPLE_RATE = 16000
-WHISPER_MODEL_SIZE = "base.en"    # tiny.en = fastest / base.en = good balance / small.en = most accurate
+WHISPER_MODEL_SIZE = "small.en"   # tiny.en = fastest / base.en = good balance / small.en = most accurate
 WHISPER_COMPUTE_TYPE = "int8"     # int8 = fast on CPU, minimal accuracy loss
 MAX_COMMAND_SECONDS = 8           # hard cap so it never listens forever
 SILENCE_THRESHOLD = 500           # fallback — auto-calibrated on startup from ambient noise

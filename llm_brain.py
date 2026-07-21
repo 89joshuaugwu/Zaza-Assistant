@@ -84,7 +84,7 @@ def _chat_stream(messages: list) -> dict:
 
     full_message = {"role": "assistant", "content": ""}
     sentence_buffer = ""
-    print(f"{ASSISTANT_NAME}: ", end="", flush=True)
+    started_printing = False
 
     for line in resp.iter_lines():
         if line:
@@ -94,6 +94,10 @@ def _chat_stream(messages: list) -> dict:
             # Content streaming
             content = msg.get("content", "")
             if content:
+                if not started_printing:
+                    print(f"{ASSISTANT_NAME}: ", end="", flush=True)
+                    started_printing = True
+                    
                 full_message["content"] += content
                 print(content, end="", flush=True)
                 sentence_buffer += content
@@ -116,7 +120,9 @@ def _chat_stream(messages: list) -> dict:
     if sentence_buffer.strip():
         speak(sentence_buffer.strip(), print_out=False)
 
-    print()  # Final newline after streaming ends
+    if started_printing:
+        print()  # Final newline after streaming ends
+        
     return {"message": full_message}
 
 
