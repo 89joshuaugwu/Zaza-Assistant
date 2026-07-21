@@ -62,9 +62,15 @@ WAKE_WORD = "jarvis"            # say literally anything you want
 
 # ── Command transcription (Whisper) ────────────────────────
 # After the wake word fires, Whisper transcribes your actual command.
-# This is where accuracy matters most.
+# Uncomment the model you want to use:
+
+# WHISPER_MODEL_SIZE = "tiny.en"     # ~40 MB - Fastest, but struggles with accents/stammers
+# WHISPER_MODEL_SIZE = "base.en"     # ~75 MB - Good speed, basic accuracy
+# WHISPER_MODEL_SIZE = "small.en"    # ~250 MB - Good balance of speed and accuracy
+# WHISPER_MODEL_SIZE = "medium.en"   # ~750 MB - Highly accurate, handles most accents well
+WHISPER_MODEL_SIZE = "Systran/faster-distil-whisper-large-v3"  # ~750 MB - The absolute best for stammers and heavy accents (Distilled Large-v3)
+
 SAMPLE_RATE = 16000
-WHISPER_MODEL_SIZE = "small.en"   # tiny.en = fastest / base.en = good balance / small.en = most accurate
 WHISPER_COMPUTE_TYPE = "int8"     # int8 = fast on CPU, minimal accuracy loss
 MAX_COMMAND_SECONDS = 8           # hard cap so it never listens forever
 SILENCE_THRESHOLD = 500           # fallback — auto-calibrated on startup from ambient noise

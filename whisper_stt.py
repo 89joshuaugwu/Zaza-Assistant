@@ -113,6 +113,14 @@ def listen_for_command():
         return ""
 
     model = _get_command_model()
-    segments, _ = model.transcribe(audio, language="en", beam_size=5)
+    # vad_filter=True forces whisper to ignore background noise and static
+    # initial_prompt provides context so it transcribes commands instead of conversational guesses
+    segments, _ = model.transcribe(
+        audio, 
+        language="en", 
+        beam_size=5,
+        vad_filter=True,
+        initial_prompt="A clear, short voice command directed to an AI computer assistant: "
+    )
     text = " ".join(seg.text.strip() for seg in segments).strip()
     return text
