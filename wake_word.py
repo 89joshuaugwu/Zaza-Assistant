@@ -17,7 +17,7 @@ import numpy as np
 import sounddevice as sd
 import time as _time
 
-from config import SAMPLE_RATE, WAKE_WORD, WAKE_THRESHOLD, ASSISTANT_NAME
+from config import SAMPLE_RATE, WAKE_MODE, WAKE_MODEL, WAKE_WORD, WAKE_THRESHOLD, ASSISTANT_NAME
 
 # Pre-trained OpenWakeWord models — if WAKE_WORD matches one, we use it
 _PRETRAINED_MODELS = {
@@ -162,16 +162,22 @@ def _listen_whisper_streaming():
 # ── Public API ────────────────────────────────────────────
 
 
+def get_active_wake_phrase() -> str:
+    """Returns the wake phrase the user should say, based on current mode."""
+    if WAKE_MODE == "model":
+        # Convert model name to spoken phrase: "hey_jarvis" → "Hey Jarvis"
+        return WAKE_MODEL.replace("_", " ").title()
+    return WAKE_WORD.title()
+
+
 def listen_for_wake_word():
-    """Blocks until the configured WAKE_WORD is heard.
+    """Blocks until the wake word/phrase is heard.
 
-    Automatically uses the best detection method:
-    - OpenWakeWord for known pre-trained phrases (lowest CPU, highest accuracy)
-    - Whisper streaming for custom phrases (works with any word/phrase)
+    Uses WAKE_MODE from config to decide the detection method:
+    - "model"  → OpenWakeWord pre-trained (hey_jarvis, alexa, hey_mycroft)
+    - "custom" → Whisper streaming (any phrase like "hey josh")
     """
-    model_name = _PRETRAINED_MODELS.get(WAKE_WORD.lower())
-
-    if model_name:
-        _listen_openwakeword(model_name)
+    if WAKE_MODE == "model":
+        _listen_openwakeword(WAKE_MODEL)
     else:
         _listen_whisper_streaming()

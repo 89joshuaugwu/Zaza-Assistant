@@ -22,7 +22,7 @@ from datetime import datetime
 import numpy as np
 import sounddevice as sd
 
-from config import ASSISTANT_NAME, WAKE_WORD, BASE_DIR, SAMPLE_RATE, CONVERSATION_TIMEOUT
+from config import ASSISTANT_NAME, BASE_DIR, SAMPLE_RATE, CONVERSATION_TIMEOUT
 from text_to_speech import speak
 from llm_brain import think
 
@@ -81,7 +81,8 @@ def _startup_greeting():
     else:
         greeting = "Good evening"
 
-    wake_display = WAKE_WORD.title()
+    from wake_word import get_active_wake_phrase
+    wake_display = get_active_wake_phrase()
     session = get_last_session_info()
 
     if session and session.get("timestamp"):

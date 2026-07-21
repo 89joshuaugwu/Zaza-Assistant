@@ -40,21 +40,25 @@ OLLAMA_URL = "http://localhost:11434/api/chat"
 OLLAMA_MODEL = "qwen2.5:3b"      # good balance of speed + tool-calling accuracy on 16GB RAM
                                   # alt: "llama3.2:3b" if qwen misbehaves
 
-# ── Wake Word Detection (dual-mode) ────────────────────────
-# Set WAKE_WORD to whatever phrase you want to say to activate the assistant.
+# ── Wake Word Detection (switchable) ───────────────────────
+# Two modes — flip WAKE_MODE to switch between them:
 #
-# If it matches a pre-trained OpenWakeWord model, that's used automatically
-# (fastest, lowest CPU). Otherwise, Whisper streaming handles it — works
-# with ANY phrase, including names like "hey josh".
+#   "model"   → Pre-trained OpenWakeWord neural model
+#               Fastest, lowest CPU (~1%), most reliable.
+#               But limited to: hey_jarvis, alexa, hey_mycroft
 #
-# Pre-trained options (best accuracy, ~1% CPU):
-#   "hey jarvis", "alexa", "hey mycroft"
+#   "custom"  → Whisper streaming detection
+#               Works with ANY phrase you want (e.g. "hey josh").
+#               Slightly more CPU (~5-10% during speech).
 #
-# Custom (any phrase, ~5-10% CPU during speech):
-#   "hey josh", "hey computer", "yo buddy", literally anything
-#
-WAKE_WORD = "hey josh"            # say this to activate the assistant
-WAKE_THRESHOLD = 0.5              # only used for pre-trained models (0.0–1.0)
+WAKE_MODE = "custom"              # "model" or "custom" — flip to switch!
+
+# Model mode settings (used when WAKE_MODE = "model")
+WAKE_MODEL = "hey_jarvis"         # options: hey_jarvis, alexa, hey_mycroft
+WAKE_THRESHOLD = 0.5              # confidence 0.0–1.0 (raise to reduce false triggers)
+
+# Custom mode settings (used when WAKE_MODE = "custom")
+WAKE_WORD = "hey josh"            # say literally anything you want
 
 # ── Command transcription (Whisper) ────────────────────────
 # After the wake word fires, Whisper transcribes your actual command.
