@@ -23,7 +23,7 @@ import numpy as np
 import sounddevice as sd
 
 from config import ASSISTANT_NAME, BASE_DIR, SAMPLE_RATE, CONVERSATION_TIMEOUT
-from text_to_speech import speak
+from text_to_speech import speak, wait_until_done
 from llm_brain import think
 
 
@@ -100,6 +100,8 @@ def _startup_greeting():
             speak(f"{greeting}! It's been a while — {ASSISTANT_NAME} is back online. Say '{wake_display}' to get started.")
     else:
         speak(f"{greeting}! I'm {ASSISTANT_NAME}, your assistant. Say '{wake_display}' to get started.")
+        
+    wait_until_done()
 
 
 def run_voice_mode():
@@ -118,6 +120,7 @@ def run_voice_mode():
             # ── Phase 1: Wait for wake word ──
             listen_for_wake_word()
             speak("Yes?")
+            wait_until_done()
 
             # ── Phase 2: Conversation mode ──
             # Stay in conversation — no wake word needed between commands.
@@ -133,6 +136,7 @@ def run_voice_mode():
                     elapsed = _time.time() - last_activity
                     if elapsed >= CONVERSATION_TIMEOUT:
                         speak("I'll be here when you need me.")
+                        wait_until_done()
                         break  # Back to wake word listening
                     # Otherwise keep listening silently
                     continue
@@ -145,26 +149,31 @@ def run_voice_mode():
                 # Check for full shutdown
                 if lower in EXIT_WORDS:
                     speak("Going offline. Later.")
+                    wait_until_done()
                     return  # Exit the assistant entirely
 
                 # Check for conversation end (back to wake word)
                 if lower in END_CONVERSATION_WORDS:
                     speak("Alright, I'm here if you need me.")
+                    wait_until_done()
                     break  # Back to wake word listening
 
                 # Process the command
                 reply = think(command)
-                speak(reply)
+                wait_until_done()
 
         except SystemExit:
             speak("Going offline. Later.")
+            wait_until_done()
             break
         except KeyboardInterrupt:
             speak("Shutting down.")
+            wait_until_done()
             break
         except Exception as e:
             print(traceback.format_exc())
             speak("I hit an error. Check the log for details.")
+            wait_until_done()
 
 
 def run_text_mode():
@@ -188,8 +197,7 @@ def run_text_mode():
             break
 
         reply = think(command)
-        print(f"{ASSISTANT_NAME}: {reply}")
-        speak(reply)  # Also speak it aloud!
+        wait_until_done()
 
 
 if __name__ == "__main__":

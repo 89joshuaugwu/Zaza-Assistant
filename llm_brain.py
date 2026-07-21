@@ -19,6 +19,7 @@ import requests
 from config import OLLAMA_URL, OLLAMA_MODEL, ASSISTANT_NAME
 from tools import get_ollama_tool_schema, execute_tool
 from memory import get_recent_summary, save_interaction
+from text_to_speech import speak
 
 # ── Personality & system prompt ──────────────────────────
 
@@ -71,16 +72,52 @@ Rules:
 _history = deque(maxlen=10)
 
 
-def _chat(messages: list) -> dict:
+def _chat_stream(messages: list) -> dict:
     payload = {
         "model": OLLAMA_MODEL,
         "messages": messages,
         "tools": get_ollama_tool_schema(),
-        "stream": False,
+        "stream": True,
     }
-    resp = requests.post(OLLAMA_URL, json=payload, timeout=60)
+    resp = requests.post(OLLAMA_URL, json=payload, stream=True, timeout=60)
     resp.raise_for_status()
-    return resp.json()
+
+    full_message = {"role": "assistant", "content": ""}
+    sentence_buffer = ""
+    print(f"{ASSISTANT_NAME}: ", end="", flush=True)
+
+    for line in resp.iter_lines():
+        if line:
+            chunk = json.loads(line)
+            msg = chunk.get("message", {})
+
+            # Content streaming
+            content = msg.get("content", "")
+            if content:
+                full_message["content"] += content
+                print(content, end="", flush=True)
+                sentence_buffer += content
+
+                # Check for sentence completion to dispatch to TTS
+                if any(p in sentence_buffer for p in ['. ', '? ', '! ', '\n']):
+                    speak(sentence_buffer.strip(), print_out=False)
+                    sentence_buffer = ""
+
+            # Tool calls streaming
+            tc = msg.get("tool_calls", [])
+            if tc:
+                if "tool_calls" not in full_message:
+                    full_message["tool_calls"] = []
+                full_message["tool_calls"].extend(tc)
+
+            if chunk.get("done"):
+                break
+
+    if sentence_buffer.strip():
+        speak(sentence_buffer.strip(), print_out=False)
+
+    print()  # Final newline after streaming ends
+    return {"message": full_message}
 
 
 def think(user_text: str) -> str:
@@ -95,17 +132,24 @@ def think(user_text: str) -> str:
     messages.append({"role": "user", "content": user_text})
 
     try:
-        response = _chat(messages)
+        response = _chat_stream(messages)
     except requests.exceptions.ConnectionError:
-        return "I can't reach Ollama. Make sure it's running — try 'ollama serve' in a terminal."
+        err = "I can't reach Ollama. Make sure it's running — try 'ollama serve' in a terminal."
+        speak(err)
+        return err
     except Exception:
-        return "Something went wrong talking to the model."
+        err = "Something went wrong talking to the model."
+        speak(err)
+        return err
 
     message = response.get("message", {})
     tool_calls = message.get("tool_calls")
 
     if not tool_calls:
-        reply = message.get("content", "").strip() or "I didn't quite catch that."
+        reply = message.get("content", "").strip()
+        if not reply:
+            reply = "I didn't quite catch that."
+            speak(reply)
         # Save to both in-session and persistent memory
         _history.append({"role": "user", "content": user_text})
         _history.append({"role": "assistant", "content": reply})
@@ -131,10 +175,14 @@ def think(user_text: str) -> str:
         })
 
     try:
-        final = _chat(messages)
-        reply = final.get("message", {}).get("content", "").strip() or "Done."
+        final = _chat_stream(messages)
+        reply = final.get("message", {}).get("content", "").strip()
+        if not reply:
+            reply = "Done."
+            speak(reply)
     except Exception:
         reply = "Done."
+        speak(reply)
 
     # Save to both in-session and persistent memory
     _history.append({"role": "user", "content": user_text})

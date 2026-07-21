@@ -68,7 +68,7 @@ WHISPER_MODEL_SIZE = "base.en"    # tiny.en = fastest / base.en = good balance /
 WHISPER_COMPUTE_TYPE = "int8"     # int8 = fast on CPU, minimal accuracy loss
 MAX_COMMAND_SECONDS = 8           # hard cap so it never listens forever
 SILENCE_THRESHOLD = 500           # fallback — auto-calibrated on startup from ambient noise
-SILENCE_DURATION = 1.2            # seconds of quiet before it decides you're done talking
+SILENCE_DURATION = 0.8            # seconds of quiet before it decides you're done talking
 
 # ── Conversation mode ─────────────────────────────────────
 # After the wake word fires, the assistant stays in conversation mode —
