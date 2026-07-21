@@ -1,13 +1,16 @@
 """
-Zaza Assistant — Command Transcription (faster-whisper)
+Zaza Assistant — Speech Recognition (faster-whisper)
 
-Vosk (speech_to_text.py) handles the wake word — fast, low overhead, "good
-enough" for spotting one keyword. This module handles the actual command —
-much higher accuracy for general speech, which is what was garbling things
-like "what is today's date" into nonsense.
+Handles BOTH:
+  1. listen_for_wake_word() — polls short chunks with a fast/tiny Whisper
+     model, checking each for WAKE_WORD. More accurate than Vosk on
+     non-dictionary words like "zaza", at the cost of higher CPU/battery
+     use since it's actively transcribing while idle (not just listening).
+  2. listen_for_command()   — records with silence-based endpointing and
+     transcribes with a larger/more accurate Whisper model.
 
-First run downloads the model (~150MB for base.en) from Hugging Face — needs
-internet once. After that it's cached locally and runs fully offline.
+First run downloads both models from Hugging Face (~40MB tiny.en + ~150MB
+base.en) — needs internet once. After that, fully offline and cached.
 """
 
 import numpy as np
@@ -15,19 +18,48 @@ import sounddevice as sd
 from faster_whisper import WhisperModel
 
 from config import (
-    SAMPLE_RATE, WHISPER_MODEL_SIZE, WHISPER_COMPUTE_TYPE,
+    SAMPLE_RATE, WAKE_WORD, WAKE_WHISPER_MODEL_SIZE, WAKE_POLL_SECONDS,
+    WHISPER_MODEL_SIZE, WHISPER_COMPUTE_TYPE,
     MAX_COMMAND_SECONDS, SILENCE_THRESHOLD, SILENCE_DURATION,
 )
 
-_model = None
+_command_model = None
+_wake_model = None
 
 
-def _get_model() -> WhisperModel:
-    global _model
-    if _model is None:
-        print(f"Loading Whisper model ({WHISPER_MODEL_SIZE})...")
-        _model = WhisperModel(WHISPER_MODEL_SIZE, device="cpu", compute_type=WHISPER_COMPUTE_TYPE)
-    return _model
+def _get_command_model() -> WhisperModel:
+    global _command_model
+    if _command_model is None:
+        print(f"Loading Whisper command model ({WHISPER_MODEL_SIZE})...")
+        _command_model = WhisperModel(WHISPER_MODEL_SIZE, device="cpu", compute_type=WHISPER_COMPUTE_TYPE)
+    return _command_model
+
+
+def _get_wake_model() -> WhisperModel:
+    global _wake_model
+    if _wake_model is None:
+        print(f"Loading Whisper wake-word model ({WAKE_WHISPER_MODEL_SIZE})...")
+        _wake_model = WhisperModel(WAKE_WHISPER_MODEL_SIZE, device="cpu", compute_type=WHISPER_COMPUTE_TYPE)
+    return _wake_model
+
+
+def _record_fixed(seconds: float) -> np.ndarray:
+    """Blocking fixed-length recording — used for wake-word polling."""
+    audio = sd.rec(int(seconds * SAMPLE_RATE), samplerate=SAMPLE_RATE, channels=1, dtype="int16")
+    sd.wait()
+    return audio.flatten().astype(np.float32) / 32768.0
+
+
+def listen_for_wake_word():
+    """Blocks until WAKE_WORD is heard in a polled audio chunk."""
+    model = _get_wake_model()
+    print(f"Listening for wake word: '{WAKE_WORD}'...")
+    while True:
+        audio = _record_fixed(WAKE_POLL_SECONDS)
+        segments, _ = model.transcribe(audio, language="en", beam_size=1)
+        text = " ".join(seg.text.strip() for seg in segments).lower()
+        if WAKE_WORD in text:
+            return
 
 
 def _record_until_silence() -> np.ndarray:
@@ -68,7 +100,7 @@ def listen_for_command() -> str:
     if audio.size < SAMPLE_RATE * 0.3:  # essentially nothing recorded
         return ""
 
-    model = _get_model()
+    model = _get_command_model()
     segments, _ = model.transcribe(audio, language="en", beam_size=5)
     text = " ".join(seg.text.strip() for seg in segments).strip()
     return text

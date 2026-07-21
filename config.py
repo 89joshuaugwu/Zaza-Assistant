@@ -15,23 +15,32 @@ else:
     BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 # ── Identity ──────────────────────────────────────────────
-ASSISTANT_NAME = "Josh"          # what you call it
-WAKE_WORD = "josh"           # phrase that activates listening (lowercase, no punctuation)
+ASSISTANT_NAME = "Zaza"          # what you call it
+WAKE_WORD = "hey zaza"           # phrase that activates listening (lowercase, no punctuation)
 
 # ── Ollama (local LLM) ────────────────────────────────────
 OLLAMA_URL = "http://localhost:11434/api/chat"
 OLLAMA_MODEL = "qwen2.5:3b"      # good balance of speed + tool-calling accuracy on 16GB RAM
                                   # alt: "llama3.2:3b" if qwen misbehaves
 
-# ── Speech-to-Text (Vosk) ─────────────────────────────────
+# ── Speech-to-Text (Vosk) — legacy/optional, kept for fallback ─
+# No longer used by default. Whisper (below) now handles both the wake
+# word and commands since it's meaningfully more accurate. Vosk is cheaper
+# on CPU/battery for pure always-on listening if you ever want to switch
+# back — see speech_to_text.py.
 VOSK_MODEL_PATH = os.path.join(BASE_DIR, "models", "vosk-model-small-en-us")
 SAMPLE_RATE = 16000
 
+# ── Wake word detection (Whisper) ──────────────────────────
+# Polls short audio chunks and transcribes each with a small/fast Whisper
+# model, checking for WAKE_WORD. More accurate than Vosk on tricky words
+# like "zaza", but uses noticeably more CPU/battery than Vosk's continuous
+# listening since it's actively transcribing every poll window.
+WAKE_WHISPER_MODEL_SIZE = "small.en"  # fast enough to poll every couple seconds
+WAKE_POLL_SECONDS = 2.5              # length of each listening chunk
+
 # ── Command transcription (Whisper — much higher accuracy) ─
-# Vosk (above) only handles the wake word — fast, always-listening, "good
-# enough" for spotting one keyword. Actual commands get transcribed with
-# Whisper instead, since Vosk's small model was garbling full sentences.
-WHISPER_MODEL_SIZE = "base.en"   # tiny.en (fastest) / base.en (good balance) / small.en (most accurate, slower)
+WHISPER_MODEL_SIZE = "small.en"   # tiny.en (fastest) / base.en (good balance) / small.en (most accurate, slower)
 WHISPER_COMPUTE_TYPE = "int8"    # int8 = fast on CPU, minimal accuracy loss
 MAX_COMMAND_SECONDS = 8          # hard cap so it never listens forever
 SILENCE_THRESHOLD = 500          # int16 amplitude below this = silence
