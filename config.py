@@ -1,7 +1,7 @@
 """
 Zaza Assistant — Configuration
 Edit this file to rename your assistant, change the LLM model,
-or add/remove apps it knows how to open.
+tweak audio settings, or add/remove apps it knows how to open.
 """
 
 import os
@@ -15,43 +15,51 @@ else:
     BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 # ── Identity ──────────────────────────────────────────────
-ASSISTANT_NAME = "Zaza"          # what you call it
-WAKE_WORD = "hey zaza"           # phrase that activates listening (lowercase, no punctuation)
+ASSISTANT_NAME = "Josh"           # what the assistant calls itself
+# The wake word you actually *say* is determined by WAKE_MODEL below
+# (e.g. "Hey Jarvis"). The assistant name is just for display/speech.
 
 # ── Ollama (local LLM) ────────────────────────────────────
 OLLAMA_URL = "http://localhost:11434/api/chat"
 OLLAMA_MODEL = "qwen2.5:3b"      # good balance of speed + tool-calling accuracy on 16GB RAM
                                   # alt: "llama3.2:3b" if qwen misbehaves
 
-# ── Speech-to-Text (Vosk) — legacy/optional, kept for fallback ─
-# No longer used by default. Whisper (below) now handles both the wake
-# word and commands since it's meaningfully more accurate. Vosk is cheaper
-# on CPU/battery for pure always-on listening if you ever want to switch
-# back — see speech_to_text.py.
-VOSK_MODEL_PATH = os.path.join(BASE_DIR, "models", "vosk-model-small-en-us")
+# ── Wake Word Detection (OpenWakeWord) ─────────────────────
+# Purpose-built neural wake word engine — much more accurate and lighter
+# on CPU than the old Whisper-polling approach. Streams audio continuously
+# in 80ms chunks with zero gaps.
+#
+# Available pre-trained models (just change the value below):
+#   "hey_jarvis"   — say "Hey Jarvis"   (recommended, most reliable)
+#   "alexa"        — say "Alexa"
+#   "hey_mycroft"  — say "Hey Mycroft"
+#
+# First run downloads the model (~few MB) — needs internet once.
+WAKE_MODEL = "hey_jarvis"         # pre-trained model name
+WAKE_THRESHOLD = 0.5              # confidence (0.0–1.0); raise if you get false triggers
+
+# ── Command transcription (Whisper) ────────────────────────
+# After the wake word fires, Whisper transcribes your actual command.
+# This is where accuracy matters most.
 SAMPLE_RATE = 16000
-
-# ── Wake word detection (Whisper) ──────────────────────────
-# Polls short audio chunks and transcribes each with a small/fast Whisper
-# model, checking for WAKE_WORD. More accurate than Vosk on tricky words
-# like "zaza", but uses noticeably more CPU/battery than Vosk's continuous
-# listening since it's actively transcribing every poll window.
-WAKE_WHISPER_MODEL_SIZE = "small.en"  # fast enough to poll every couple seconds
-WAKE_POLL_SECONDS = 2.5              # length of each listening chunk
-
-# ── Command transcription (Whisper — much higher accuracy) ─
-WHISPER_MODEL_SIZE = "small.en"   # tiny.en (fastest) / base.en (good balance) / small.en (most accurate, slower)
-WHISPER_COMPUTE_TYPE = "int8"    # int8 = fast on CPU, minimal accuracy loss
-MAX_COMMAND_SECONDS = 8          # hard cap so it never listens forever
-SILENCE_THRESHOLD = 500          # int16 amplitude below this = silence
-SILENCE_DURATION = 1.2           # seconds of quiet before it decides you're done talking
+WHISPER_MODEL_SIZE = "base.en"    # tiny.en = fastest / base.en = good balance / small.en = most accurate
+WHISPER_COMPUTE_TYPE = "int8"     # int8 = fast on CPU, minimal accuracy loss
+MAX_COMMAND_SECONDS = 8           # hard cap so it never listens forever
+SILENCE_THRESHOLD = 500           # fallback — auto-calibrated on startup from ambient noise
+SILENCE_DURATION = 1.2            # seconds of quiet before it decides you're done talking
 
 # ── Text-to-Speech ────────────────────────────────────────
-TTS_RATE = 175                   # words per minute
+TTS_RATE = 175                    # words per minute
 TTS_VOLUME = 1.0
+TTS_VOICE_INDEX = 0               # 0 = default Windows voice, 1 = next installed voice, etc.
+                                  # To list available voices, run:
+                                  #   python -c "import pyttsx3; e=pyttsx3.init(); [print(i,v.name) for i,v in enumerate(e.getProperty('voices'))]"
+
+# ── Vosk (legacy — kept for reference, not used by default) ─
+# VOSK_MODEL_PATH = os.path.join(BASE_DIR, "models", "vosk-model-small-en-us")
 
 # ── Known applications ────────────────────────────────────
-# Add your own here. Key = what you'll say, Value = command Windows runs.
+# Key = what you'll say, Value = command Windows runs.
 # For most installed apps, the plain .exe name works because Windows resolves
 # it via App Paths in the registry. If one doesn't open, give the full path.
 APP_PATHS = {

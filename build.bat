@@ -10,19 +10,26 @@ pyinstaller --onefile --noconsole --name ZazaAssistant ^
     --hidden-import=sounddevice ^
     --hidden-import=pyttsx3.drivers ^
     --hidden-import=pyttsx3.drivers.sapi5 ^
+    --hidden-import=faster_whisper ^
+    --hidden-import=ctranslate2 ^
+    --hidden-import=openwakeword ^
+    --hidden-import=pyperclip ^
+    --hidden-import=pycaw ^
+    --hidden-import=pycaw.pycaw ^
+    --hidden-import=comtypes ^
     --collect-all vosk ^
+    --collect-all openwakeword ^
+    --collect-all ctranslate2 ^
     main.py
 
 echo.
 echo Build complete. Copying required files next to the .exe ...
 
-REM models/ and config.py's app paths must sit next to the exe, not inside it,
-REM since VOSK_MODEL_PATH resolves relative to the exe's location at runtime.
-xcopy /E /I /Y models dist\models
+REM models/ folder kept for potential future use (Vosk fallback)
+if exist models xcopy /E /I /Y models dist\models
 
 echo.
 echo Done. Your app is at: dist\ZazaAssistant.exe
-echo The models\vosk-model-small-en-us folder must stay next to it.
 echo.
 echo Next: run setup_task_scheduler.bat to make it launch at login.
 pause

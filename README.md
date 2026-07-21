@@ -1,24 +1,17 @@
-# Zaza Assistant
+# Josh Assistant (formerly Zaza)
 
 Offline, local, voice-controlled PC assistant. No API keys, no subscriptions,
-no internet required after setup (aside from two one-time model downloads).
-Runs entirely on your HP 255 G10.
+no internet required after setup (aside from one-time model downloads).
 
-Wake word + command transcription (faster-whisper) → local LLM decides which
-tool to call (Ollama + Qwen2.5:3b) → action executes (open app/file/folder,
-check time, etc.) → text-to-speech reads the result back (pyttsx3).
+Say **"Hey Jarvis"** → it says "Yes?" → give your command → it does it and
+reads the result back. Everything runs 100% on your machine.
 
-**Both the wake word and your commands go through Whisper now.** Vosk was
-tried first for the wake word (cheaper on CPU/battery for always-on
-listening) but its small model struggled with non-dictionary words like
-"zaza." Whisper is meaningfully more accurate for both, at the cost of
-higher idle CPU/battery use since it's actively transcribing short chunks
-every couple seconds while waiting, rather than passively listening. Vosk
-is left in the project as an optional fallback if you'd rather trade some
-accuracy back for lower power draw — see the note in `config.py`.
+**Pipeline:**
+Wake word detection (OpenWakeWord) → command transcription (faster-whisper)
+→ local LLM decides which tool to call (Ollama + Qwen2.5:3b) → action
+executes → text-to-speech reads the result back (pyttsx3).
 
-Total disk footprint: ~5-9GB (Ollama model + Whisper tiny.en + base.en,
-Vosk optional). Your 80GB free is plenty.
+Total disk footprint: ~3-5GB (Ollama model + Whisper base.en + OpenWakeWord).
 
 ---
 
@@ -62,45 +55,21 @@ venv\Scripts\activate
 pip install -r requirements.txt
 ```
 
-This installs Vosk, faster-whisper, sounddevice, pyttsx3, and the packaging
-tools (pyinstaller, pystray).
-
-Note: `sounddevice` needs PortAudio — on Windows this ships bundled with the
-pip wheel, so **you almost certainly don't need anything extra here.** Only
-if `python main.py` later throws a PortAudio-related error, try:
-
-```powershell
-pip install pipwin
-pipwin install pyaudio
-```
-
-⚠️ Heads up: `pipwin` depends on `js2py`, which is unmaintained and breaks on
-newer Python versions (`RuntimeError: Your python version made changes to
-the bytecode`). If you hit that, skip pipwin entirely and instead download a
-prebuilt PyAudio wheel manually from
-https://www.lfd.uci.edu/~gohlke/pythonlibs/#pyaudio matching your Python
-version, then `pip install <downloaded_file>.whl`. In practice this whole
-step is rarely needed — don't run it preemptively.
+This installs OpenWakeWord, faster-whisper, sounddevice, pyttsx3, pycaw,
+pyperclip, and the packaging tools (pyinstaller, pystray).
 
 ---
 
 ## 3. Speech models — no manual download needed
 
-Whisper downloads both models it needs automatically the first time you run
-`main.py`: `tiny.en` (~40MB, for wake-word polling) and `base.en` (~150MB,
-for command transcription). That first run needs internet; after that it's
-cached locally and fully offline.
+**OpenWakeWord** downloads its wake word model (~few MB) automatically
+the first time you run `main.py`.
 
-**Skip this whole section unless you want the Vosk fallback.** If you'd
-rather trade some accuracy for lower CPU/battery use on the wake word (see
-the note in `config.py`), you can optionally set up Vosk instead:
+**Whisper** downloads the `base.en` model (~150MB) automatically on first
+run for command transcription.
 
-1. Go to: https://alphacephei.com/vosk/models
-2. Download `vosk-model-small-en-us-0.15.zip`
-3. Extract it into `zaza-assistant/models/`
-4. Rename the extracted folder to exactly: `vosk-model-small-en-us`
-5. In `main.py`, swap `from whisper_stt import listen_for_wake_word` back to
-   `from speech_to_text import listen_for_wake_word`
+Both need internet once; after that everything is cached locally and
+fully offline.
 
 ---
 
@@ -112,8 +81,10 @@ Voice mode (mic required):
 python main.py
 ```
 
-Say **"Hey Zaza"**, wait for it to say "Yes?", then give your command — talk
-normally, it stops recording on its own once you go quiet:
+On startup it checks your mic (shows volume level), loads the wake word
+engine, then says "Josh is online. Say 'Hey Jarvis' to activate."
+
+Say **"Hey Jarvis"**, wait for it to say "Yes?", then give your command:
 - "what time is it"
 - "what's today's date"
 - "open chrome"
@@ -121,6 +92,11 @@ normally, it stops recording on its own once you go quiet:
 - "close notepad"
 - "what's my battery at"
 - "search my documents for CSC 466"
+- "set volume to 50 percent"
+- "pause the music" / "next track" / "skip"
+- "what's in my clipboard"
+- "remind me in 10 minutes to check the oven"
+- "take a screenshot"
 
 Text mode (no mic, good for quick testing):
 
@@ -134,20 +110,22 @@ Say "stop" or "exit" any time to shut it down.
 
 ## 5. Customize it
 
-**Rename the assistant / change wake word** → `config.py`:
+**Rename the assistant** → `config.py`:
 ```python
-ASSISTANT_NAME = "Zaza"
-WAKE_WORD = "hey zaza"
+ASSISTANT_NAME = "Josh"   # what it calls itself in speech
 ```
-With Whisper handling the wake word now, made-up names like "Zaza" work
-fine — it's much better than Vosk at unusual words. You can go back to
-something short and common if you ever switch back to the optional Vosk
-fallback (see step 3).
+Note: the wake word ("Hey Jarvis") is determined by the OpenWakeWord model,
+not the assistant name. See below to change it.
 
-**Trade wake-word responsiveness/accuracy for CPU/battery** → `config.py`:
+**Change the wake word** → `config.py`:
 ```python
-WAKE_WHISPER_MODEL_SIZE = "tiny.en"  # bump to "base.en" for more accuracy, slower polling
-WAKE_POLL_SECONDS = 2.5              # shorter = more responsive, more CPU use
+WAKE_MODEL = "hey_jarvis"   # also available: "alexa", "hey_mycroft"
+WAKE_THRESHOLD = 0.5        # raise to reduce false triggers, lower for easier triggering
+```
+
+**Trade Whisper speed for accuracy (or vice versa)** → `config.py`:
+```python
+WHISPER_MODEL_SIZE = "base.en"   # tiny.en = fastest, small.en = most accurate
 ```
 
 **Adjust how long it waits for you to finish talking** → `config.py`:
@@ -156,9 +134,13 @@ MAX_COMMAND_SECONDS = 8     # hard cap, in case silence detection fails
 SILENCE_DURATION = 1.2      # seconds of quiet before it decides you're done
 ```
 
-**Trade Whisper speed for accuracy (or vice versa)** → `config.py`:
+**Change TTS voice** → `config.py`:
 ```python
-WHISPER_MODEL_SIZE = "base.en"   # tiny.en = fastest, small.en = most accurate
+TTS_VOICE_INDEX = 0   # 0 = default, try 1, 2, etc. for different voices
+```
+To see available voices:
+```powershell
+python -c "import pyttsx3; e=pyttsx3.init(); [print(i,v.name) for i,v in enumerate(e.getProperty('voices'))]"
 ```
 
 **Add apps it can open** → `config.py`, `APP_PATHS` dict. If an app doesn't
@@ -185,14 +167,15 @@ Ollama sees from whatever's in `TOOLS`.
 | Problem | Fix |
 |---|---|
 | "I can't reach Ollama" | Run `ollama serve` manually in a terminal, leave it open |
-| Wake word never triggers | Whisper is much better at unusual words than Vosk was, but check `WAKE_WORD` in config.py matches what you're actually saying — it's a substring match, case-insensitive |
+| Wake word never triggers | Check mic permissions (Settings → Privacy → Microphone), try lowering `WAKE_THRESHOLD` in config.py to 0.3 |
+| Startup says "Mic seems silent" | Check Windows mic permissions, make sure no other app has exclusive mic access |
 | Mic not picking up anything | Check Windows mic permissions: Settings → Privacy → Microphone |
 | Commands transcribe poorly | Bump `WHISPER_MODEL_SIZE` up to `small.en` in config.py for more accuracy (slower) |
 | It cuts you off mid-sentence or waits too long | Tune `SILENCE_DURATION` (lower = cuts off sooner, higher = waits longer) in config.py |
-| First run hangs after "Loading Whisper..." | That's the one-time model download (~40MB + ~150MB) — needs internet, just let it finish |
-| High CPU/fan noise while idle | Expected — it's polling with Whisper every `WAKE_POLL_SECONDS`. Increase that value, or switch to the optional Vosk fallback (step 3) for near-zero idle cost |
+| First run hangs after "Loading..." | That's the one-time model download — needs internet, just let it finish |
 | App won't open by short name | Add its full `.exe` path to `APP_PATHS` in config.py |
 | Slow responses | 3B model should be fast on 16GB RAM; if sluggish, close other heavy apps, or try `llama3.2:1b` for speed over accuracy |
+| Volume control doesn't work | Make sure pycaw is installed: `pip install pycaw` |
 
 ---
 
@@ -207,12 +190,7 @@ build.bat
 ```
 
 This produces `dist\ZazaAssistant.exe` — a double-clickable app, no Python
-or terminal needed to run it. The `models\` folder gets copied next to it
-automatically (the .exe reads it from there at runtime, not bundled inside).
-
-Note: the Whisper model cache (downloaded in step 3) lives in your Windows
-user profile, not the project folder, so it's already available to the
-packaged .exe too — no extra copying needed there.
+or terminal needed to run it.
 
 **Make it launch automatically at login:**
 
@@ -228,14 +206,14 @@ schtasks /Run /TN "ZazaAssistant"
 To remove the auto-launch later: run `remove_task_scheduler.bat` as admin.
 
 **Since `--noconsole` hides all output**, two things replace it:
-- A **tray icon** (navy/gold "Z", matches your PenWork4Me brand) appears in
+- A **tray icon** (navy/gold, first letter of your assistant name) appears in
   the system tray — right-click it → Quit to stop the assistant cleanly.
 - All prints/errors get redirected to `zaza.log` next to the .exe, so if
   something's not working, check that file first.
 
 **Full picture after this step:** PC boots → Ollama service already running
 in background → Task Scheduler silently launches `ZazaAssistant.exe` →
-tray icon appears → it's listening for "Hey Zaza." No terminal, no venv,
+tray icon appears → it's listening for "Hey Jarvis." No terminal, no venv,
 no manual anything.
 
 **Rebuilding after code changes:** just re-run `build.bat`. It overwrites
@@ -244,13 +222,38 @@ don't need to re-register it.
 
 ---
 
-## 8. Performance notes for your specs (16GB RAM, 512GB SSD)
+## 8. Available tools (what you can say)
+
+| Tool | Example Commands |
+|---|---|
+| Time | "what time is it" |
+| Date | "what's today's date" |
+| Open app | "open chrome", "open notepad", "open calculator" |
+| Close app | "close notepad", "close chrome" |
+| Open folder | "open my documents", "open downloads" |
+| Open file | "open [full path to file]" |
+| Search files | "search my documents for homework" |
+| Open website | "open google.com", "go to youtube" |
+| System info | "how much disk space do I have" |
+| Battery | "what's my battery at" |
+| Volume | "set volume to 50 percent", "mute", "max volume" |
+| Media | "pause the music", "next track", "skip", "play" |
+| Clipboard | "what's in my clipboard", "what did I copy" |
+| Reminder | "remind me in 10 minutes to check the oven" |
+| Screenshot | "take a screenshot" |
+
+The assistant also remembers the last 5 exchanges, so follow-up commands
+like "open the first one" after a file search work.
+
+---
+
+## 9. Performance notes for your specs (16GB RAM, 512GB SSD)
 
 - `qwen2.5:3b` quantized sits around 2GB in RAM while loaded — no strain
-- Whisper `tiny.en` (wake word) and `base.en` (commands) both run
-  comfortably on CPU — wake-word polling adds ongoing background CPU use
-  while idle, worth knowing if you run on battery a lot (see step 6)
+- OpenWakeWord uses ~1-3% CPU for wake word detection (much less than the
+  old Whisper polling approach)
+- Whisper `base.en` (commands) runs comfortably on CPU
 - First response after starting Ollama is slower (model loads into memory),
   subsequent ones are fast
-- Everything here runs 100% offline once Ollama and both Whisper models are
-  downloaded — no data leaves your machine, no recurring cost
+- Everything here runs 100% offline once all models are downloaded — no
+  data leaves your machine, no recurring cost

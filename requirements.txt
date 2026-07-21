@@ -8,3 +8,6 @@ pystray
 pillow
 faster-whisper
 numpy
+openwakeword
+pycaw
+pyperclip

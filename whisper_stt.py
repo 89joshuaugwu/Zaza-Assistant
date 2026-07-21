@@ -1,16 +1,12 @@
 """
-Zaza Assistant — Speech Recognition (faster-whisper)
+Zaza Assistant — Command Transcription (faster-whisper)
 
-Handles BOTH:
-  1. listen_for_wake_word() — polls short chunks with a fast/tiny Whisper
-     model, checking each for WAKE_WORD. More accurate than Vosk on
-     non-dictionary words like "zaza", at the cost of higher CPU/battery
-     use since it's actively transcribing while idle (not just listening).
-  2. listen_for_command()   — records with silence-based endpointing and
-     transcribes with a larger/more accurate Whisper model.
+Records a voice command with silence-based endpointing and transcribes
+it using a local Whisper model. The wake word is handled separately by
+wake_word.py (OpenWakeWord) — this module only does command transcription.
 
-First run downloads both models from Hugging Face (~40MB tiny.en + ~150MB
-base.en) — needs internet once. After that, fully offline and cached.
+First run downloads the Whisper model (~150MB for base.en) from Hugging
+Face — needs internet once. After that, fully offline and cached.
 """
 
 import numpy as np
@@ -18,54 +14,49 @@ import sounddevice as sd
 from faster_whisper import WhisperModel
 
 from config import (
-    SAMPLE_RATE, WAKE_WORD, WAKE_WHISPER_MODEL_SIZE, WAKE_POLL_SECONDS,
-    WHISPER_MODEL_SIZE, WHISPER_COMPUTE_TYPE,
+    SAMPLE_RATE, WHISPER_MODEL_SIZE, WHISPER_COMPUTE_TYPE,
     MAX_COMMAND_SECONDS, SILENCE_THRESHOLD, SILENCE_DURATION,
 )
 
 _command_model = None
-_wake_model = None
 
 
-def _get_command_model() -> WhisperModel:
+def _get_command_model():
     global _command_model
     if _command_model is None:
         print(f"Loading Whisper command model ({WHISPER_MODEL_SIZE})...")
-        _command_model = WhisperModel(WHISPER_MODEL_SIZE, device="cpu", compute_type=WHISPER_COMPUTE_TYPE)
+        _command_model = WhisperModel(
+            WHISPER_MODEL_SIZE, device="cpu", compute_type=WHISPER_COMPUTE_TYPE
+        )
     return _command_model
 
 
-def _get_wake_model() -> WhisperModel:
-    global _wake_model
-    if _wake_model is None:
-        print(f"Loading Whisper wake-word model ({WAKE_WHISPER_MODEL_SIZE})...")
-        _wake_model = WhisperModel(WAKE_WHISPER_MODEL_SIZE, device="cpu", compute_type=WHISPER_COMPUTE_TYPE)
-    return _wake_model
+def _calibrate_silence(duration=0.5):
+    """Record a short silence sample and measure the ambient noise floor.
+    Returns a threshold slightly above the ambient level so silence
+    detection adapts to whatever mic + room combo the user has."""
+    try:
+        audio = sd.rec(
+            int(SAMPLE_RATE * duration), samplerate=SAMPLE_RATE,
+            channels=1, dtype="int16"
+        )
+        sd.wait()
+        ambient = np.abs(audio).mean()
+        # Set threshold at 3x ambient noise — generous margin above the floor
+        threshold = max(int(ambient * 3), 200)  # minimum 200 to avoid over-sensitivity
+        print(f"  Ambient noise: {ambient:.0f}, silence threshold set to: {threshold}")
+        return threshold
+    except Exception:
+        return SILENCE_THRESHOLD  # fallback to config value
 
 
-def _record_fixed(seconds: float) -> np.ndarray:
-    """Blocking fixed-length recording — used for wake-word polling."""
-    audio = sd.rec(int(seconds * SAMPLE_RATE), samplerate=SAMPLE_RATE, channels=1, dtype="int16")
-    sd.wait()
-    return audio.flatten().astype(np.float32) / 32768.0
-
-
-def listen_for_wake_word():
-    """Blocks until WAKE_WORD is heard in a polled audio chunk."""
-    model = _get_wake_model()
-    print(f"Listening for wake word: '{WAKE_WORD}'...")
-    while True:
-        audio = _record_fixed(WAKE_POLL_SECONDS)
-        segments, _ = model.transcribe(audio, language="en", beam_size=1)
-        text = " ".join(seg.text.strip() for seg in segments).lower()
-        if WAKE_WORD in text:
-            return
-
-
-def _record_until_silence() -> np.ndarray:
+def _record_until_silence(silence_threshold=None):
     """Records from the mic until you stop talking (or hits the max cap).
-    This replaces a fixed-duration recording so it doesn't cut you off mid
-    sentence or sit there recording dead air after you're done."""
+
+    Returns (audio_array, heard_speech). The caller can skip transcription
+    if heard_speech is False — this avoids Whisper hallucinations on dead air.
+    """
+    threshold = silence_threshold or SILENCE_THRESHOLD
     block_duration = 0.2  # seconds per read
     block_size = int(SAMPLE_RATE * block_duration)
     silence_blocks_needed = int(SILENCE_DURATION / block_duration)
@@ -81,7 +72,7 @@ def _record_until_silence() -> np.ndarray:
             frames.append(data.copy())
 
             volume = np.abs(data).mean()
-            if volume > SILENCE_THRESHOLD:
+            if volume > threshold:
                 heard_speech = True
                 silent_run = 0
             else:
@@ -91,13 +82,18 @@ def _record_until_silence() -> np.ndarray:
                 break
 
     audio = np.concatenate(frames, axis=0).flatten()
-    return audio.astype(np.float32) / 32768.0  # int16 -> normalized float32 for whisper
+    return audio.astype(np.float32) / 32768.0, heard_speech
 
 
-def listen_for_command() -> str:
+def listen_for_command():
     """Records a command with silence-based endpointing and transcribes it."""
-    audio = _record_until_silence()
-    if audio.size < SAMPLE_RATE * 0.3:  # essentially nothing recorded
+    # Auto-calibrate silence threshold from current ambient noise
+    threshold = _calibrate_silence()
+
+    audio, heard_speech = _record_until_silence(silence_threshold=threshold)
+
+    # Don't waste time transcribing silence — avoids Whisper hallucinations
+    if not heard_speech or audio.size < SAMPLE_RATE * 0.3:
         return ""
 
     model = _get_command_model()

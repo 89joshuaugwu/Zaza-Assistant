@@ -6,27 +6,37 @@ it without Task Manager.
 """
 
 import threading
+import time
 from PIL import Image, ImageDraw
 import pystray
 
 from config import ASSISTANT_NAME
 
 _icon = None
+_shutdown_event = threading.Event()
+
+
+def should_shutdown():
+    """Returns True if the user clicked Quit in the tray menu."""
+    return _shutdown_event.is_set()
 
 
 def _make_icon_image():
-    # Simple generated icon — a filled circle with "Z" — no external asset needed
-    img = Image.new("RGB", (64, 64), color=(27, 43, 107))  # navy, matches PenWork4Me brand
+    # Simple generated icon — a filled circle with the first letter of the assistant name
+    letter = ASSISTANT_NAME[0].upper() if ASSISTANT_NAME else "Z"
+    img = Image.new("RGB", (64, 64), color=(27, 43, 107))  # navy background
     d = ImageDraw.Draw(img)
     d.ellipse((4, 4, 60, 60), fill=(245, 166, 35))  # gold circle
-    d.text((22, 18), "Z", fill=(27, 43, 107))
+    d.text((22, 18), letter, fill=(27, 43, 107))
     return img
 
 
 def _on_quit(icon, _item):
     icon.stop()
-    # Hard exit — the voice loop runs in the main thread and won't check
-    # a flag mid-listen, so we terminate the process outright.
+    _shutdown_event.set()
+    # Give the main loop a moment to see the shutdown signal and exit cleanly.
+    # Safety-net hard exit in case the main thread is blocked mid-listen.
+    time.sleep(2)
     import os
     os._exit(0)
 
