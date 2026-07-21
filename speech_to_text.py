@@ -1,8 +1,8 @@
 """
-Zaza Assistant — Speech to Text (offline, via Vosk)
-Two modes:
-  1. listen_for_wake_word() — blocks until the wake phrase is heard
-  2. listen_for_command()   — records a few seconds and transcribes it
+Zaza Assistant — Wake Word Detection (offline, via Vosk)
+Only handles listen_for_wake_word() — blocks until the wake phrase is heard.
+Actual command transcription happens in whisper_stt.py instead, since Vosk's
+small model was too inaccurate for full sentences.
 """
 
 import json
@@ -12,7 +12,7 @@ import os
 import sounddevice as sd
 from vosk import Model, KaldiRecognizer
 
-from config import VOSK_MODEL_PATH, SAMPLE_RATE, WAKE_WORD, COMMAND_LISTEN_SECONDS
+from config import VOSK_MODEL_PATH, SAMPLE_RATE, WAKE_WORD
 
 _audio_q = queue.Queue()
 
@@ -56,24 +56,3 @@ def listen_for_wake_word():
                 if WAKE_WORD in text:
                     return
 
-
-def listen_for_command(seconds: int = COMMAND_LISTEN_SECONDS) -> str:
-    """Records `seconds` of audio and returns the transcribed text."""
-    rec = KaldiRecognizer(_get_model(), SAMPLE_RATE)
-    frames_needed = int(SAMPLE_RATE * seconds / 8000)
-
-    with sd.RawInputStream(
-        samplerate=SAMPLE_RATE, blocksize=8000, dtype="int16",
-        channels=1, callback=_callback
-    ):
-        print("Listening for your command...")
-        # drain any leftover audio from the wake-word phase
-        while not _audio_q.empty():
-            _audio_q.get()
-
-        for _ in range(frames_needed):
-            data = _audio_q.get()
-            rec.AcceptWaveform(data)
-
-        final = json.loads(rec.FinalResult())
-        return final.get("text", "").strip()

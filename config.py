@@ -26,7 +26,16 @@ OLLAMA_MODEL = "qwen2.5:3b"      # good balance of speed + tool-calling accuracy
 # ── Speech-to-Text (Vosk) ─────────────────────────────────
 VOSK_MODEL_PATH = os.path.join(BASE_DIR, "models", "vosk-model-small-en-us")
 SAMPLE_RATE = 16000
-COMMAND_LISTEN_SECONDS = 5       # how long it records after wake word before transcribing
+
+# ── Command transcription (Whisper — much higher accuracy) ─
+# Vosk (above) only handles the wake word — fast, always-listening, "good
+# enough" for spotting one keyword. Actual commands get transcribed with
+# Whisper instead, since Vosk's small model was garbling full sentences.
+WHISPER_MODEL_SIZE = "base.en"   # tiny.en (fastest) / base.en (good balance) / small.en (most accurate, slower)
+WHISPER_COMPUTE_TYPE = "int8"    # int8 = fast on CPU, minimal accuracy loss
+MAX_COMMAND_SECONDS = 8          # hard cap so it never listens forever
+SILENCE_THRESHOLD = 500          # int16 amplitude below this = silence
+SILENCE_DURATION = 1.2           # seconds of quiet before it decides you're done talking
 
 # ── Text-to-Speech ────────────────────────────────────────
 TTS_RATE = 175                   # words per minute

@@ -31,7 +31,8 @@ if getattr(sys, "frozen", False):
 
 
 def run_voice_mode():
-    from speech_to_text import listen_for_wake_word, listen_for_command
+    from speech_to_text import listen_for_wake_word
+    from whisper_stt import listen_for_command
 
     if getattr(sys, "frozen", False):
         from tray import start_tray_in_background

@@ -6,3 +6,5 @@ psutil
 pyinstaller
 pystray
 pillow
+faster-whisper
+numpy
