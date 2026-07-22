@@ -257,18 +257,34 @@ class FloatingWidget(QWidget):
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
         
         if self.state == "sleeping":
-            color = QColor(100, 100, 100, 120)
+            base_color = QColor(100, 100, 100, 150)
+            glow_color = QColor(100, 100, 100, 40)
         elif self.state == "listening":
-            color = QColor(0, 255, 255, 200)
+            base_color = QColor(0, 255, 255, 255)
+            glow_color = QColor(0, 200, 255, 100)
         elif self.state == "thinking":
-            color = QColor(148, 0, 211, 200)
+            base_color = QColor(180, 50, 255, 255)
+            glow_color = QColor(148, 0, 211, 100)
         elif self.state == "speaking":
-            color = QColor(255, 0, 128, 200)
+            base_color = QColor(255, 50, 150, 255)
+            glow_color = QColor(255, 0, 128, 100)
             
-        painter.setBrush(QBrush(color))
-        painter.setPen(Qt.PenStyle.NoPen)
+        from PyQt6.QtGui import QRadialGradient
         cx, cy = self.width() // 2, 70
-        painter.drawEllipse(cx - int(self.radius), cy - int(self.radius), int(self.radius * 2), int(self.radius * 2))
+        
+        # Create a beautiful glowing gradient
+        gradient = QRadialGradient(cx, cy, self.radius * 1.5)
+        gradient.setColorAt(0.0, QColor(255, 255, 255, 255)) # Bright core
+        gradient.setColorAt(0.3, base_color)                 # Main color
+        gradient.setColorAt(0.8, glow_color)                 # Soft glow
+        gradient.setColorAt(1.0, QColor(0, 0, 0, 0))         # Fade to transparent
+        
+        painter.setBrush(QBrush(gradient))
+        painter.setPen(Qt.PenStyle.NoPen)
+        
+        # Draw a slightly larger ellipse to accommodate the glow
+        glow_radius = int(self.radius * 1.5)
+        painter.drawEllipse(cx - glow_radius, cy - glow_radius, glow_radius * 2, glow_radius * 2)
 
     def mousePressEvent(self, event):
         if event.button() == Qt.MouseButton.LeftButton:

@@ -32,7 +32,11 @@ def get_current_date(_args=None):
 
 
 def open_application(args: dict):
-    """args: {'app_name': str}"""
+    """
+    Opens an application or program by name (e.g. 'notepad', 'chrome', 'word', 'calculator').
+    Always use this tool when the user says "open [app]" or "launch [app]".
+    args: {'app_name': str}
+    """
     app_name = (args or {}).get("app_name", "").strip().lower()
     if not app_name:
         return "You didn't tell me which app to open."
@@ -62,7 +66,11 @@ def open_application(args: dict):
 
 
 def close_application(args: dict):
-    """args: {'app_name': str} — kills the process by matching name (Windows/Linux)."""
+    """
+    Closes a running application or program by name.
+    Always use this tool when the user says "close [app]" or "kill [app]".
+    args: {'app_name': str}
+    """
     import psutil
     app_name = (args or {}).get("app_name", "").strip().lower()
     if not app_name:
@@ -90,7 +98,10 @@ def close_application(args: dict):
 
 
 def open_folder(args: dict):
-    """args: {'folder_name': str} — one of documents/downloads/desktop/pictures, or a raw path."""
+    """
+    Opens a specific folder on the computer (e.g., 'documents', 'downloads', 'desktop').
+    args: {'folder_name': str}
+    """
     folder_name = (args or {}).get("folder_name", "").strip().lower()
     if not folder_name:
         return "Which folder do you want opened?"
@@ -110,7 +121,10 @@ def open_folder(args: dict):
 
 
 def open_file(args: dict):
-    """args: {'file_path': str} — opens any file with its default program."""
+    """
+    Opens a specific file using its exact full path. Do not use this to open applications.
+    args: {'file_path': str}
+    """
     file_path = (args or {}).get("file_path", "").strip()
     if not file_path:
         return "Which file should I open?"
@@ -127,7 +141,11 @@ def open_file(args: dict):
 
 
 def search_files(args: dict):
-    """args: {'query': str, 'directory': str (optional, defaults to Documents)}"""
+    """
+    Searches the computer for files matching a query. Only use this if the user asks to FIND a file.
+    Do not use this if the user asks to OPEN an application (use open_application instead).
+    args: {'query': str, 'directory': str}
+    """
     query = (args or {}).get("query", "").strip().lower()
     directory = (args or {}).get("directory") or FOLDER_PATHS["documents"]
 
@@ -151,7 +169,11 @@ def search_files(args: dict):
 
 
 def open_website(args: dict):
-    """args: {'url': str}"""
+    """
+    Opens a specific website URL in the default browser. 
+    Use this when the user says "open website [URL]" or "go to [URL]".
+    args: {'url': str}
+    """
     url = (args or {}).get("url", "").strip()
     if not url:
         return "Which website should I open?"
@@ -162,7 +184,11 @@ def open_website(args: dict):
 
 
 def search_the_web(args: dict):
-    """args: {'query': str}"""
+    """
+    Searches the internet for information, trivia, news, or answers to questions.
+    Use this when the user asks a question you don't know the answer to, or explicitly asks to search the web.
+    args: {'query': str}
+    """
     query = (args or {}).get("query", "").strip()
     if not query:
         return "What do you want me to search for?"
@@ -183,6 +209,10 @@ def search_the_web(args: dict):
 
 
 def close_active_window(_args=None):
+    """
+    Closes the currently active window on the user's screen (sends Alt+F4).
+    Use this when the user says "close this window" or "close this".
+    """
     if platform.system() == "Windows":
         try:
             import pyautogui
@@ -196,6 +226,10 @@ def close_active_window(_args=None):
 
 
 def switch_window(_args=None):
+    """
+    Switches to the previous window (sends Alt+Tab).
+    Use this when the user says "switch window" or "alt tab".
+    """
     if platform.system() == "Windows":
         try:
             import pyautogui
@@ -209,6 +243,10 @@ def switch_window(_args=None):
 
 
 def get_system_info(_args=None):
+    """
+    Gets information about the computer's OS, CPU architecture, and total/free storage space.
+    Use this when the user asks for system info, disk space, or what OS they are running.
+    """
     # Use the system drive on Windows instead of "/" which may pick the wrong drive
     if platform.system() == "Windows":
         drive = os.environ.get("SYSTEMDRIVE", "C:") + "\\"
@@ -224,6 +262,10 @@ def get_system_info(_args=None):
 
 
 def get_battery_status(_args=None):
+    """
+    Gets the current battery percentage and charging status of the computer/laptop.
+    Use this when the user asks "what is my battery at" or "is my laptop charging".
+    """
     battery = psutil.sensors_battery()
     if battery is None:
         return "No battery detected — probably running on a desktop."
@@ -562,7 +604,7 @@ TOOLS = {
     },
     "open_application": {
         "func": open_application,
-        "description": "Open a desktop application by name, e.g. chrome, notepad, vscode, calculator.",
+        "description": "CRITICAL: USE THIS TOOL when the user says 'open [app]' or 'launch [app]' (e.g. notepad, chrome, word). DO NOT use search_files to open applications.",
         "parameters": {
             "type": "object",
             "properties": {"app_name": {"type": "string", "description": "Name of the app to open"}},
@@ -598,7 +640,7 @@ TOOLS = {
     },
     "search_files": {
         "func": search_files,
-        "description": "Search for files by name inside a directory (defaults to Documents).",
+        "description": "Search for files by name. WARNING: DO NOT use this to open or launch applications. Only use this if the user wants to FIND a file.",
         "parameters": {
             "type": "object",
             "properties": {
