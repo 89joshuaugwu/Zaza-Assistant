@@ -15,34 +15,59 @@
     
     <div class="content">
         <div class="setting-group">
-            <h3>Voice Engine</h3>
+            <h3>Wake Detection</h3>
             <div class="setting-item">
-                <label for="wake-word">Wake Word</label>
-                <input type="text" id="wake-word" value="hey jarvis">
+                <label for="wake-mode">Wake Mode</label>
+                <select id="wake-mode" onchange="toggleWakeSettings()">
+                    <option value="model">OpenWakeWord (Fastest, Low CPU)</option>
+                    <option value="custom">Whisper (Custom Phrase, Higher CPU)</option>
+                </select>
             </div>
+            
+            <div id="wake-model-group" class="setting-item">
+                <label for="wake-model">Pre-trained Wake Word</label>
+                <select id="wake-model">
+                    <option value="hey_jarvis">Hey Jarvis</option>
+                    <option value="alexa">Alexa</option>
+                    <option value="hey_mycroft">Hey Mycroft</option>
+                </select>
+            </div>
+
+            <div id="wake-word-group" class="setting-item" style="display: none;">
+                <label for="wake-word">Custom Wake Phrase</label>
+                <input type="text" id="wake-word" value="hey josh">
+            </div>
+        </div>
+
+        <div class="setting-group">
+            <h3>Voice Engine (Whisper)</h3>
             <div class="setting-item">
                 <label for="whisper-model">Whisper Model</label>
                 <select id="whisper-model">
-                    <option value="tiny.en">Tiny (Fastest)</option>
-                    <option value="base.en">Base</option>
-                    <option value="small.en">Small (Balanced)</option>
+                    <option value="tiny.en">Tiny (~40MB, Fastest)</option>
+                    <option value="base.en">Base (~75MB)</option>
+                    <option value="small.en">Small (~250MB, Balanced)</option>
+                    <option value="medium.en">Medium (~750MB, Accurate)</option>
+                    <option value="Systran/faster-distil-whisper-large-v3">Distil Large V3 (~750MB)</option>
+                    <option value="deepdml/faster-whisper-large-v3-turbo-ct2">Turbo Large V3 (~1.6GB, Best)</option>
                 </select>
             </div>
         </div>
 
         <div class="setting-group">
-            <h3>AI Brain</h3>
+            <h3>AI Brain (Ollama)</h3>
             <div class="setting-item">
                 <label for="ollama-model">Ollama Model</label>
                 <select id="ollama-model">
-                    <option value="llama3.2:1b">Llama 3.2 1B</option>
-                    <option value="llama3">Llama 3</option>
+                    <option value="qwen2.5:3b">qwen2.5:3b (Highly Recommended)</option>
+                    <option value="llama3.2:3b">llama3.2:3b</option>
+                    <option value="llama3.2:1b">llama3.2:1b (Fastest, less accurate)</option>
                 </select>
             </div>
         </div>
 
         <button class="save-btn" onclick="saveSettings()">Save Configuration</button>
-        <p id="save-status" style="display:none; color: #00ff00; font-size: 14px; text-align:center; margin-top: 10px;">Settings Saved!</p>
+        <p id="save-status" style="display:none; color: #00ff00; font-size: 14px; text-align:center; margin-top: 10px;">Settings Saved! Restart to apply.</p>
     </div>
 
     <script src="dashboard.js"></script>

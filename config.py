@@ -27,7 +27,7 @@ if HF_TOKEN:
     os.environ["HUGGING_FACE_HUB_TOKEN"] = HF_TOKEN
 
 # ── Identity ──────────────────────────────────────────────
-ASSISTANT_NAME = "Josh"           # what the assistant calls itself
+ASSISTANT_NAME = os.getenv("ASSISTANT_NAME", "Josh")
 
 # ── Security (voice PIN) ──────────────────────────────────
 # Set a numeric PIN (0–1000) to protect sensitive tools.
@@ -36,7 +36,7 @@ ASSISTANT_NAME = "Josh"           # what the assistant calls itself
 #
 # Set to None to disable (all tools run without PIN).
 # Change the number to your own secret PIN:
-SECURITY_PIN = 2002               # e.g. 742 — set your own number here!
+SECURITY_PIN = int(os.getenv("SECURITY_PIN", 2002))               # e.g. 742 — set your own number here!
 
 # Which tools require PIN verification before executing:
 PROTECTED_TOOLS = {
@@ -48,12 +48,12 @@ PROTECTED_TOOLS = {
 # Add or remove tool names from this set to customize what's protected.
 
 # ── Ollama (local LLM) ────────────────────────────────────
-OLLAMA_URL = "http://localhost:11434/api/chat"
+OLLAMA_URL = os.getenv("OLLAMA_URL", "http://localhost:11434/api/chat")
 
 # Uncomment the LLM model you want to use:
 # OLLAMA_MODEL = "qwen2.5:3b"      # Highly recommended: extremely accurate at calling tools
 # OLLAMA_MODEL = "llama3.2:3b"     # Good alternative
-OLLAMA_MODEL = "llama3.2:1b"     # Fastest, but very bad at calling tools (often hallucinates)
+OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "llama3.2:1b")     # Fastest, but very bad at calling tools (often hallucinates)
 
 # ── Wake Word Detection (switchable) ───────────────────────
 # Two modes — flip WAKE_MODE to switch between them:
@@ -66,14 +66,14 @@ OLLAMA_MODEL = "llama3.2:1b"     # Fastest, but very bad at calling tools (often
 #               Works with ANY phrase you want (e.g. "hey josh").
 #               Slightly more CPU (~5-10% during speech).
 #
-WAKE_MODE = "model"              # "model" or "custom" — flip to switch!
+WAKE_MODE = os.getenv("WAKE_MODE", "model")              # "model" or "custom" — flip to switch!
 
 # Model mode settings (used when WAKE_MODE = "model")
-WAKE_MODEL = "hey_jarvis"         # options: hey_jarvis, alexa, hey_mycroft
-WAKE_THRESHOLD = 0.5              # confidence 0.0–1.0 (raise to reduce false triggers)
+WAKE_MODEL = os.getenv("WAKE_MODEL", "hey_jarvis")         # options: hey_jarvis, alexa, hey_mycroft
+WAKE_THRESHOLD = float(os.getenv("WAKE_THRESHOLD", 0.5))              # confidence 0.0–1.0 (raise to reduce false triggers)
 
 # Custom mode settings (used when WAKE_MODE = "custom")
-WAKE_WORD = "jarvis"            # say literally anything you want
+WAKE_WORD = os.getenv("WAKE_WORD", "jarvis")            # say literally anything you want
 
 # ── Command transcription (Whisper) ────────────────────────
 # After the wake word fires, Whisper transcribes your actual command.
@@ -84,19 +84,19 @@ WAKE_WORD = "jarvis"            # say literally anything you want
 # WHISPER_MODEL_SIZE = "small.en"    # ~250 MB - Good balance of speed and accuracy
 # WHISPER_MODEL_SIZE = "medium.en"   # ~750 MB - Highly accurate, handles most accents well
 # WHISPER_MODEL_SIZE = "Systran/faster-distil-whisper-large-v3"  # ~750 MB - Distilled Large-v3
-WHISPER_MODEL_SIZE = "deepdml/faster-whisper-large-v3-turbo-ct2" # ~1.6 GB - The absolute best speed/accuracy ratio (Turbo)
+WHISPER_MODEL_SIZE = os.getenv("WHISPER_MODEL_SIZE", "deepdml/faster-whisper-large-v3-turbo-ct2") # ~1.6 GB - The absolute best speed/accuracy ratio (Turbo)
 
-SAMPLE_RATE = 16000
-WHISPER_COMPUTE_TYPE = "int8"     # int8 = fast on CPU, minimal accuracy loss
-MAX_COMMAND_SECONDS = 8           # hard cap so it never listens forever
-SILENCE_THRESHOLD = 500           # fallback — auto-calibrated on startup from ambient noise
-SILENCE_DURATION = 0.8            # seconds of quiet before it decides you're done talking
+SAMPLE_RATE = int(os.getenv("SAMPLE_RATE", 16000))
+WHISPER_COMPUTE_TYPE = os.getenv("WHISPER_COMPUTE_TYPE", "int8")     # int8 = fast on CPU, minimal accuracy loss
+MAX_COMMAND_SECONDS = int(os.getenv("MAX_COMMAND_SECONDS", 8))           # hard cap so it never listens forever
+SILENCE_THRESHOLD = int(os.getenv("SILENCE_THRESHOLD", 500))           # fallback — auto-calibrated on startup from ambient noise
+SILENCE_DURATION = float(os.getenv("SILENCE_DURATION", 0.8))            # seconds of quiet before it decides you're done talking
 
 # ── Conversation mode ─────────────────────────────────────
 # After the wake word fires, the assistant stays in conversation mode —
 # you can keep talking without saying the wake word again. It only goes
 # back to listening for the wake word after this many seconds of silence.
-CONVERSATION_TIMEOUT = 30         # seconds of silence before ending conversation
+CONVERSATION_TIMEOUT = int(os.getenv("CONVERSATION_TIMEOUT", 30))         # seconds of silence before ending conversation
 
 # ── Persistent memory ─────────────────────────────────────
 # Conversation history is saved locally so the assistant remembers past
