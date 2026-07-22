@@ -268,6 +268,10 @@ def set_reminder(args: dict):
     if minutes <= 0 or minutes > 1440:
         return "Pick a time between 1 minute and 24 hours."
 
+    import datetime
+    target_time = datetime.datetime.now() + datetime.timedelta(minutes=minutes)
+    time_str = target_time.strftime("%I:%M %p")  # e.g., 04:30 PM
+
     def _remind():
         from text_to_speech import speak
         speak(f"Reminder: {message}")
@@ -276,9 +280,7 @@ def set_reminder(args: dict):
     timer.daemon = True
     timer.start()
 
-    if minutes == 1:
-        return f"Got it — I'll remind you in 1 minute: {message}"
-    return f"Got it — I'll remind you in {minutes:.0f} minutes: {message}"
+    return f"Got it — I've set your reminder. I will remind you at exactly {time_str} ({minutes} minutes from now) about: {message}"
 
 
 def take_screenshot(_args=None):

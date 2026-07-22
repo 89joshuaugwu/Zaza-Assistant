@@ -14,6 +14,18 @@ if getattr(sys, "frozen", False):
 else:
     BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
+# ── Hugging Face Authentication (optional for faster downloads) ──
+# We load the token securely from the .env file instead of hardcoding it here.
+try:
+    from dotenv import load_dotenv
+    load_dotenv(os.path.join(BASE_DIR, ".env"))
+except ImportError:
+    pass
+
+HF_TOKEN = os.environ.get("HF_TOKEN")
+if HF_TOKEN:
+    os.environ["HUGGING_FACE_HUB_TOKEN"] = HF_TOKEN
+
 # ── Identity ──────────────────────────────────────────────
 ASSISTANT_NAME = "Josh"           # what the assistant calls itself
 
@@ -37,8 +49,11 @@ PROTECTED_TOOLS = {
 
 # ── Ollama (local LLM) ────────────────────────────────────
 OLLAMA_URL = "http://localhost:11434/api/chat"
-OLLAMA_MODEL = "qwen2.5:3b"      # good balance of speed + tool-calling accuracy on 16GB RAM
-                                  # alt: "llama3.2:3b" if qwen misbehaves
+
+# Uncomment the LLM model you want to use:
+# OLLAMA_MODEL = "qwen2.5:3b"      # Highly recommended: extremely accurate at calling tools
+# OLLAMA_MODEL = "llama3.2:3b"     # Good alternative
+OLLAMA_MODEL = "llama3.2:1b"     # Fastest, but very bad at calling tools (often hallucinates)
 
 # ── Wake Word Detection (switchable) ───────────────────────
 # Two modes — flip WAKE_MODE to switch between them:
@@ -68,7 +83,8 @@ WAKE_WORD = "jarvis"            # say literally anything you want
 # WHISPER_MODEL_SIZE = "base.en"     # ~75 MB - Good speed, basic accuracy
 # WHISPER_MODEL_SIZE = "small.en"    # ~250 MB - Good balance of speed and accuracy
 # WHISPER_MODEL_SIZE = "medium.en"   # ~750 MB - Highly accurate, handles most accents well
-WHISPER_MODEL_SIZE = "Systran/faster-distil-whisper-large-v3"  # ~750 MB - The absolute best for stammers and heavy accents (Distilled Large-v3)
+# WHISPER_MODEL_SIZE = "Systran/faster-distil-whisper-large-v3"  # ~750 MB - Distilled Large-v3
+WHISPER_MODEL_SIZE = "deepdml/faster-whisper-large-v3-turbo-ct2" # ~1.6 GB - The absolute best speed/accuracy ratio (Turbo)
 
 SAMPLE_RATE = 16000
 WHISPER_COMPUTE_TYPE = "int8"     # int8 = fast on CPU, minimal accuracy loss

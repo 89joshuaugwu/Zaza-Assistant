@@ -11,3 +11,4 @@ numpy
 openwakeword
 pycaw
 pyperclip
+python-dotenv
