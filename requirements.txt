@@ -14,4 +14,4 @@ pyperclip
 python-dotenv
 duckduckgo-search
 pyautogui
-PyQt6
+pywebview

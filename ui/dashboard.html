@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Zaza Settings</title>
+    <link rel="stylesheet" href="dashboard.css">
+</head>
+<body>
+    <div class="header">
+        <div class="drag-region"></div>
+        <h1>Zaza Settings</h1>
+        <button class="close-btn" onclick="closeDashboard()">✕</button>
+    </div>
+    
+    <div class="content">
+        <div class="setting-group">
+            <h3>Voice Engine</h3>
+            <div class="setting-item">
+                <label for="wake-word">Wake Word</label>
+                <input type="text" id="wake-word" value="hey jarvis">
+            </div>
+            <div class="setting-item">
+                <label for="whisper-model">Whisper Model</label>
+                <select id="whisper-model">
+                    <option value="tiny.en">Tiny (Fastest)</option>
+                    <option value="base.en">Base</option>
+                    <option value="small.en">Small (Balanced)</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="setting-group">
+            <h3>AI Brain</h3>
+            <div class="setting-item">
+                <label for="ollama-model">Ollama Model</label>
+                <select id="ollama-model">
+                    <option value="llama3.2:1b">Llama 3.2 1B</option>
+                    <option value="llama3">Llama 3</option>
+                </select>
+            </div>
+        </div>
+
+        <button class="save-btn" onclick="saveSettings()">Save Configuration</button>
+        <p id="save-status" style="display:none; color: #00ff00; font-size: 14px; text-align:center; margin-top: 10px;">Settings Saved!</p>
+    </div>
+
+    <script src="dashboard.js"></script>
+</body>
+</html>
