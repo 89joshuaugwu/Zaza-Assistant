@@ -62,28 +62,31 @@ def open_application(args: dict):
 
 
 def close_application(args: dict):
-    """args: {'app_name': str} — kills the process by image name (Windows)."""
+    """args: {'app_name': str} — kills the process by matching name (Windows/Linux)."""
+    import psutil
     app_name = (args or {}).get("app_name", "").strip().lower()
     if not app_name:
         return "You didn't tell me which app to close."
 
-    process_name = APP_PATHS.get(app_name, app_name)
-    exe = process_name if process_name.endswith(".exe") else f"{process_name}.exe"
+    # 1. Check if we have a known mapping in APP_PATHS
+    mapped_name = APP_PATHS.get(app_name, app_name)
+    exe_name = mapped_name if mapped_name.endswith(".exe") else f"{mapped_name}.exe"
+    
+    killed = 0
+    # 2. Iterate through all running processes
+    for proc in psutil.process_iter(['pid', 'name']):
+        try:
+            p_name = proc.info['name'].lower()
+            # Match against known exe name OR fuzzy match the spoken word
+            if p_name == exe_name or app_name in p_name.replace(".exe", "") or mapped_name in p_name.replace(".exe", ""):
+                proc.kill()
+                killed += 1
+        except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
+            pass
 
-    try:
-        if platform.system() == "Windows":
-            result = subprocess.run(
-                ["taskkill", "/IM", exe, "/F"],
-                capture_output=True, text=True
-            )
-            if result.returncode == 0:
-                return f"Closed {app_name}."
-            return f"{app_name} doesn't seem to be running."
-        else:
-            subprocess.run(["pkill", "-f", process_name])
-            return f"Closed {app_name}."
-    except Exception:
-        return f"Couldn't close {app_name}."
+    if killed > 0:
+        return f"Closed {app_name}."
+    return f"I couldn't find {app_name} running."
 
 
 def open_folder(args: dict):
@@ -156,6 +159,53 @@ def open_website(args: dict):
         url = "https://" + url
     webbrowser.open(url)
     return f"Opening {url}."
+
+
+def search_the_web(args: dict):
+    """args: {'query': str}"""
+    query = (args or {}).get("query", "").strip()
+    if not query:
+        return "What do you want me to search for?"
+    try:
+        from duckduckgo_search import DDGS
+        with DDGS() as ddgs:
+            results = list(ddgs.text(query, max_results=3))
+        if not results:
+            return f"I couldn't find any results for {query}."
+        
+        snippets = [f"{r.get('title', '')}: {r.get('body', '')}" for r in results]
+        combined = " ".join(snippets)
+        return f"Search results for '{query}': {combined[:600]}..."
+    except ImportError:
+        return "The duckduckgo-search module is not installed."
+    except Exception as e:
+        return f"Search failed: {e}"
+
+
+def close_active_window(_args=None):
+    if platform.system() == "Windows":
+        try:
+            import pyautogui
+            pyautogui.hotkey('alt', 'f4')
+            return "Closed active window."
+        except ImportError:
+            return "The pyautogui module is not installed."
+        except Exception as e:
+            return f"Couldn't close window: {e}"
+    return "This tool only works on Windows."
+
+
+def switch_window(_args=None):
+    if platform.system() == "Windows":
+        try:
+            import pyautogui
+            pyautogui.hotkey('alt', 'tab')
+            return "Switched window."
+        except ImportError:
+            return "The pyautogui module is not installed."
+        except Exception as e:
+            return f"Couldn't switch window: {e}"
+    return "This tool only works on Windows."
 
 
 def get_system_info(_args=None):
@@ -566,6 +616,25 @@ TOOLS = {
             "properties": {"url": {"type": "string", "description": "URL or domain to open"}},
             "required": ["url"],
         },
+    },
+    "search_the_web": {
+        "func": search_the_web,
+        "description": "Search the internet for real-time information, weather, or facts. DO NOT use this for local files.",
+        "parameters": {
+            "type": "object",
+            "properties": {"query": {"type": "string", "description": "The search query"}},
+            "required": ["query"],
+        },
+    },
+    "close_active_window": {
+        "func": close_active_window,
+        "description": "Closes the currently active/foreground window.",
+        "parameters": {"type": "object", "properties": {}, "required": []},
+    },
+    "switch_window": {
+        "func": switch_window,
+        "description": "Switches to the previous window (simulates Alt+Tab).",
+        "parameters": {"type": "object", "properties": {}, "required": []},
     },
     "get_system_info": {
         "func": get_system_info,

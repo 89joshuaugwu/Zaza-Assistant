@@ -12,3 +12,5 @@ openwakeword
 pycaw
 pyperclip
 python-dotenv
+duckduckgo-search
+pyautogui
