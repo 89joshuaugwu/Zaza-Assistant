@@ -118,48 +118,75 @@ def run_voice_mode():
     while True:
         try:
             # ── Phase 1: Wait for wake word ──
+            try:
+                from gui import signals
+                signals.state_changed.emit("sleeping")
+                signals.text_updated.emit("Sleeping...")
+            except ImportError: pass
+            
             listen_for_wake_word()
+            
+            try:
+                from gui import signals
+                signals.state_changed.emit("speaking")
+                signals.text_updated.emit("Yes?")
+            except ImportError: pass
+            
             speak("Yes?")
             wait_until_done()
 
             # ── Phase 2: Conversation mode ──
-            # Stay in conversation — no wake word needed between commands.
-            # Only returns to wake-word listening after CONVERSATION_TIMEOUT
-            # seconds of silence, or if the user explicitly ends it.
             last_activity = _time.time()
 
             while True:
+                try:
+                    from gui import signals
+                    signals.state_changed.emit("listening")
+                    signals.text_updated.emit("Listening...")
+                except ImportError: pass
+                
                 command = listen_for_command()
 
                 if not command:
-                    # No speech detected in this window — check timeout
                     elapsed = _time.time() - last_activity
                     if elapsed >= CONVERSATION_TIMEOUT:
+                        try:
+                            from gui import signals
+                            signals.state_changed.emit("speaking")
+                        except ImportError: pass
                         speak("I'll be here when you need me.")
                         wait_until_done()
-                        break  # Back to wake word listening
-                    # Otherwise keep listening silently
+                        break
                     continue
 
                 last_activity = _time.time()
                 print(f"You said: {command}")
+                
+                try:
+                    from gui import signals
+                    signals.state_changed.emit("thinking")
+                    signals.text_updated.emit(f"You: {command}")
+                except ImportError: pass
 
                 lower = command.lower().strip()
-
-                # Check for full shutdown
                 if lower in EXIT_WORDS:
                     speak("Going offline. Later.")
                     wait_until_done()
-                    return  # Exit the assistant entirely
+                    return
 
-                # Check for conversation end (back to wake word)
                 if lower in END_CONVERSATION_WORDS:
                     speak("Alright, I'm here if you need me.")
                     wait_until_done()
-                    break  # Back to wake word listening
+                    break
 
-                # Process the command
                 reply = think(command)
+                
+                try:
+                    from gui import signals
+                    signals.state_changed.emit("speaking")
+                    signals.text_updated.emit("Josh is replying...")
+                except ImportError: pass
+                
                 wait_until_done()
 
         except SystemExit:
@@ -203,5 +230,12 @@ def run_text_mode():
 if __name__ == "__main__":
     if "--text" in sys.argv:
         run_text_mode()
-    else:
+    elif "--cli" in sys.argv:
         run_voice_mode()
+    else:
+        try:
+            from gui import launch_gui
+            launch_gui()
+        except ImportError as e:
+            print(f"Could not load GUI ({e}). Falling back to CLI mode.")
+            run_voice_mode()
