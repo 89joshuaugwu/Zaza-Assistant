@@ -154,15 +154,58 @@ def think(user_text: str) -> str:
     if not tool_calls:
         reply = message.get("content", "").strip()
         
-        # Fallback for models (like qwen or llama) that output raw JSON instead of using native tool calls
-        if reply.startswith("{") and reply.endswith("}"):
-            import json
-            try:
-                parsed = json.loads(reply)
-                if "name" in parsed and "parameters" in parsed:
-                    tool_calls = [{"function": {"name": parsed["name"], "arguments": parsed["parameters"]}}]
-            except Exception:
-                pass
+        # Robust fallback for models that output raw JSON or python-like function calls
+        if not tool_calls:
+            import re, json
+            
+            # 1. Try to find a python-like call: tool_name({"arg": "val"})
+            for match in re.finditer(r'([a-zA-Z0-9_]+)\s*\(\s*(\{.*?\})\s*\)', reply):
+                name = match.group(1)
+                if name in TOOLS:
+                    try:
+                        args = json.loads(match.group(2))
+                        tool_calls = [{"function": {"name": name, "arguments": args}}]
+                        break
+                    except Exception:
+                        pass
+            
+            # 2. Try to find JSON objects line by line
+            if not tool_calls:
+                for line in reply.split('\n'):
+                    if "{" not in line or "}" not in line: continue
+                    
+                    # Extract the JSON portion of the line
+                    json_str = line[line.find("{"):line.rfind("}")+1]
+                    # Quick fix for trailing commas before closing braces
+                    json_str = re.sub(r',\s*\}', '}', json_str)
+                    
+                    try:
+                        parsed = json.loads(json_str)
+                        fobj = None
+                        
+                        # Support OpenAI-style wrappers {"type":"function", "function": {"name": ...}}
+                        if "type" in parsed and parsed["type"] == "function" and "function" in parsed:
+                            if isinstance(parsed["function"], dict):
+                                fobj = parsed["function"]
+                            elif isinstance(parsed["function"], str):
+                                fobj = {"name": parsed["function"]}
+                                if "parameters" in parsed: fobj["parameters"] = parsed["parameters"]
+                                elif "param" in parsed: fobj["parameters"] = parsed["param"]
+                        # Support direct JSON {"name": ...}
+                        elif "name" in parsed:
+                            fobj = parsed
+                            
+                        # If a valid tool is found
+                        if fobj and "name" in fobj and fobj["name"] in TOOLS:
+                            args = fobj.get("parameters", fobj.get("arguments", fobj.get("param", {})))
+                            if isinstance(args, str):
+                                try: args = json.loads(args)
+                                except Exception: args = {}
+                            if isinstance(args, dict):
+                                tool_calls = [{"function": {"name": fobj["name"], "arguments": args}}]
+                                break
+                    except Exception:
+                        pass
 
         if not tool_calls:
             if not reply:
@@ -199,7 +242,12 @@ def think(user_text: str) -> str:
             if isinstance(args, dict):
                 args["app_name"] = app_name
 
-        result = execute_tool(name, args)
+        try:
+            result = execute_tool(name, args)
+        except Exception as e:
+            result = f"Error executing tool {name}: {e}"
+            print(result)
+            
         messages.append({
             "role": "tool",
             "content": result,

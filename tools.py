@@ -453,6 +453,93 @@ def type_text(args: dict):
 
 
 def send_message(args: dict):
+    """
+    Send a direct message to a specific contact on chat apps like WhatsApp, Discord, or Telegram.
+    Automates opening the app, searching the contact, typing, and sending.
+    """
+    app_name = (args or {}).get("app_name", "").strip().lower()
+    contact_name = (args or {}).get("contact_name", "").strip()
+    message = (args or {}).get("message", "").strip()
+
+    if not app_name or not contact_name or not message:
+        return "I need an app name, a contact name, and a message to send."
+
+    # Open the application
+    open_res = open_application({"app_name": app_name})
+    if "couldn't find" in open_res.lower():
+        return open_res
+
+    import time
+    import pyperclip
+    import ctypes
+
+    # Give the app time to load and focus
+    time.sleep(3)
+
+    VK_CONTROL = 0x11
+    VK_F = 0x46
+    VK_V = 0x56
+    VK_RETURN = 0x0D
+    KEYEVENTF_KEYUP = 0x0002
+
+    def press_key(vk):
+        ctypes.windll.user32.keybd_event(vk, 0, 0, 0)
+        time.sleep(0.05)
+        ctypes.windll.user32.keybd_event(vk, 0, KEYEVENTF_KEYUP, 0)
+
+    # 1. Search for the contact
+    # In WhatsApp and many chat apps, Ctrl+F opens search
+    ctypes.windll.user32.keybd_event(VK_CONTROL, 0, 0, 0)
+    ctypes.windll.user32.keybd_event(VK_F, 0, 0, 0)
+    time.sleep(0.05)
+    ctypes.windll.user32.keybd_event(VK_F, 0, KEYEVENTF_KEYUP, 0)
+    ctypes.windll.user32.keybd_event(VK_CONTROL, 0, KEYEVENTF_KEYUP, 0)
+    
+    time.sleep(1)
+
+    # Paste contact name
+    old_clip = ""
+    try:
+        old_clip = pyperclip.paste()
+    except Exception:
+        pass
+
+    pyperclip.copy(contact_name)
+    time.sleep(0.1)
+
+    ctypes.windll.user32.keybd_event(VK_CONTROL, 0, 0, 0)
+    ctypes.windll.user32.keybd_event(VK_V, 0, 0, 0)
+    time.sleep(0.05)
+    ctypes.windll.user32.keybd_event(VK_V, 0, KEYEVENTF_KEYUP, 0)
+    ctypes.windll.user32.keybd_event(VK_CONTROL, 0, KEYEVENTF_KEYUP, 0)
+
+    time.sleep(1.5) # Wait for search results
+    press_key(VK_RETURN)
+    time.sleep(1) # Wait to enter chat
+
+    # 2. Paste the message
+    pyperclip.copy(message)
+    time.sleep(0.1)
+
+    ctypes.windll.user32.keybd_event(VK_CONTROL, 0, 0, 0)
+    ctypes.windll.user32.keybd_event(VK_V, 0, 0, 0)
+    time.sleep(0.05)
+    ctypes.windll.user32.keybd_event(VK_V, 0, KEYEVENTF_KEYUP, 0)
+    ctypes.windll.user32.keybd_event(VK_CONTROL, 0, KEYEVENTF_KEYUP, 0)
+
+    time.sleep(0.5)
+    press_key(VK_RETURN)
+
+    time.sleep(0.5)
+    try:
+        pyperclip.copy(old_clip)
+    except Exception:
+        pass
+
+    return f"I've sent your message to {contact_name} on {app_name}."
+
+
+def send_message(args: dict):
     """Automates opening a chat app, searching for a contact, and sending a message."""
     app = (args or {}).get("app_name", "whatsapp").strip().lower()
     contact = (args or {}).get("contact_name", "").strip()
