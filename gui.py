@@ -14,61 +14,131 @@ class Signals(QObject):
 
 signals = Signals()
 
+from PyQt6.QtWidgets import QStackedWidget, QListWidget, QFrame
+
+class DraggableHeader(QWidget):
+    def mousePressEvent(self, event):
+        if event.button() == Qt.MouseButton.LeftButton:
+            self.drag_pos = event.globalPosition().toPoint()
+            
+    def mouseMoveEvent(self, event):
+        if hasattr(self, 'drag_pos'):
+            delta = event.globalPosition().toPoint() - self.drag_pos
+            window = self.window()
+            window.move(window.x() + delta.x(), window.y() + delta.y())
+            self.drag_pos = event.globalPosition().toPoint()
+            
+    def mouseReleaseEvent(self, event):
+        if hasattr(self, 'drag_pos'):
+            del self.drag_pos
+
 class SettingsDialog(QDialog):
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setWindowTitle("Zaza Settings Dashboard")
-        self.setFixedSize(500, 480)
+        self.setWindowTitle("Zaza Dashboard")
+        self.setFixedSize(700, 500)
+        self.setWindowFlags(Qt.WindowType.FramelessWindowHint | Qt.WindowType.Dialog)
+        self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
+        
         self.setStyleSheet("""
-            QDialog { background-color: #1a1a1f; color: #fff; }
-            QLabel { color: #fff; font-family: 'Segoe UI'; font-size: 13px; font-weight: 500; }
-            QTabWidget::pane { border: 1px solid #444; border-radius: 8px; background: #1f1f26; }
-            QTabBar::tab { background: #23232c; color: #aaa; padding: 10px 20px; border-top-left-radius: 6px; border-top-right-radius: 6px; margin-right: 2px; }
-            QTabBar::tab:selected { background: #0088ff; color: #fff; font-weight: bold; }
+            QDialog { background: transparent; }
+            #MainFrame {
+                background-color: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1, stop: 0 #1a3379, stop: 0.5 #0f172a, stop: 1 black);
+                border-radius: 15px; border: 1px solid #38bdf8;
+            }
+            QLabel { color: #e2e8f0; font-family: 'Segoe UI'; font-size: 13px; font-weight: 500; }
+            QListWidget {
+                background: transparent; border: none; outline: none;
+            }
+            QListWidget::item {
+                color: #94a3b8; padding: 15px 20px; font-size: 14px; font-weight: bold; border-radius: 8px; margin-bottom: 5px;
+            }
+            QListWidget::item:selected {
+                background-color: rgba(56, 189, 248, 0.2); color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.5);
+            }
+            QListWidget::item:hover:!selected {
+                background-color: rgba(255, 255, 255, 0.05); color: white;
+            }
             QComboBox, QLineEdit { 
-                background-color: #23232c; color: #fff; 
-                border: 1px solid #444; border-radius: 6px; padding: 6px; font-size: 13px;
+                background-color: rgba(0, 0, 0, 0.4); color: white; 
+                border: 1px solid #334155; border-radius: 6px; padding: 8px; font-size: 13px;
             }
-            QComboBox:focus, QLineEdit:focus { border: 1px solid #0088ff; }
-            QPushButton { 
-                background-color: #0088ff; color: #fff; 
-                border-radius: 8px; padding: 12px; font-size: 14px; font-weight: bold; 
+            QComboBox:focus, QLineEdit:focus { border: 1px solid #38bdf8; background-color: rgba(15, 23, 42, 0.8); }
+            QPushButton#SaveBtn { 
+                background-color: #0284c7; color: white; border-radius: 8px; padding: 12px; font-size: 14px; font-weight: bold; 
             }
-            QPushButton:hover { background-color: #0077dd; }
+            QPushButton#SaveBtn:hover { background-color: #38bdf8; }
+            QPushButton#CloseBtn {
+                background-color: transparent; color: #94a3b8; font-size: 16px; font-weight: bold; border: none;
+            }
+            QPushButton#CloseBtn:hover { color: #ef4444; }
         """)
 
-        layout = QVBoxLayout(self)
-        layout.setSpacing(15)
-        layout.setContentsMargins(15, 15, 15, 15)
+        # Main wrapper
+        self.main_frame = QFrame(self)
+        self.main_frame.setObjectName("MainFrame")
+        self.main_frame.setGeometry(0, 0, 700, 500)
+        
+        main_layout = QVBoxLayout(self.main_frame)
+        main_layout.setContentsMargins(0, 0, 0, 0)
+        main_layout.setSpacing(0)
 
+        # Custom Header
+        header = DraggableHeader(self.main_frame)
+        header.setFixedHeight(40)
+        header_layout = QHBoxLayout(header)
+        header_layout.setContentsMargins(20, 0, 15, 0)
+        
+        title = QLabel("Zaza Assistant Dashboard")
+        title.setStyleSheet("font-size: 14px; font-weight: bold; color: #38bdf8;")
+        close_btn = QPushButton("✕")
+        close_btn.setObjectName("CloseBtn")
+        close_btn.setFixedSize(30, 30)
+        close_btn.clicked.connect(self.reject)
+        
+        header_layout.addWidget(title)
+        header_layout.addStretch()
+        header_layout.addWidget(close_btn)
+        main_layout.addWidget(header)
+        
+        # Content Area (Sidebar + Pages)
+        content_widget = QWidget()
+        content_layout = QHBoxLayout(content_widget)
+        content_layout.setContentsMargins(15, 10, 20, 20)
+        content_layout.setSpacing(20)
+
+        # Sidebar
+        self.sidebar = QListWidget()
+        self.sidebar.setFixedWidth(180)
+        self.sidebar.addItems(["Identity", "Voice Engine", "Advanced Tools"])
+        self.sidebar.setCurrentRow(0)
+        
+        # Stacked Pages
+        self.pages = QStackedWidget()
+        
         from config import (WAKE_MODE, WAKE_MODEL, WAKE_WORD, WHISPER_MODEL_SIZE, 
                             OLLAMA_MODEL, ASSISTANT_NAME, SECURITY_PIN, OLLAMA_URL,
                             WAKE_THRESHOLD, SAMPLE_RATE, WHISPER_COMPUTE_TYPE,
                             MAX_COMMAND_SECONDS, SILENCE_THRESHOLD, SILENCE_DURATION, 
                             CONVERSATION_TIMEOUT, HF_TOKEN)
 
-        self.tabs = QTabWidget()
-        
-        # TAB 1: Identity & Security
-        tab1 = QWidget()
-        layout1 = QFormLayout(tab1)
-        layout1.setSpacing(12)
-        
+        # PAGE 1: Identity
+        page1 = QWidget()
+        layout1 = QFormLayout(page1)
+        layout1.setSpacing(15)
         self.assistant_name = QLineEdit(ASSISTANT_NAME)
         self.security_pin = QLineEdit(str(SECURITY_PIN))
         self.hf_token = QLineEdit(HF_TOKEN if HF_TOKEN else "")
         self.hf_token.setPlaceholderText("hf_...")
-        
         layout1.addRow("Assistant Name:", self.assistant_name)
         layout1.addRow("Security PIN:", self.security_pin)
         layout1.addRow("Hugging Face Token:", self.hf_token)
-        self.tabs.addTab(tab1, "Identity")
+        self.pages.addWidget(page1)
 
-        # TAB 2: Voice & Wake
-        tab2 = QWidget()
-        layout2 = QFormLayout(tab2)
-        layout2.setSpacing(12)
-        
+        # PAGE 2: Voice
+        page2 = QWidget()
+        layout2 = QFormLayout(page2)
+        layout2.setSpacing(15)
         self.wake_mode = QComboBox()
         self.wake_mode.addItems(["model", "custom"])
         self.wake_mode.setCurrentText(WAKE_MODE)
@@ -85,20 +155,18 @@ class SettingsDialog(QDialog):
         self.whisper_compute = QComboBox()
         self.whisper_compute.addItems(["int8", "float16", "float32"])
         self.whisper_compute.setCurrentText(WHISPER_COMPUTE_TYPE)
-
         layout2.addRow("Wake Mode:", self.wake_mode)
         layout2.addRow("Neural Wake Word:", self.wake_model)
         layout2.addRow("Custom Phrase:", self.wake_word)
         layout2.addRow("Wake Threshold (0-1):", self.wake_threshold)
         layout2.addRow("Whisper Model:", self.whisper_model)
         layout2.addRow("Compute Type:", self.whisper_compute)
-        self.tabs.addTab(tab2, "Voice Engine")
+        self.pages.addWidget(page2)
 
-        # TAB 3: Advanced Tweaks
-        tab3 = QWidget()
-        layout3 = QFormLayout(tab3)
-        layout3.setSpacing(12)
-        
+        # PAGE 3: Advanced
+        page3 = QWidget()
+        layout3 = QFormLayout(page3)
+        layout3.setSpacing(15)
         self.ollama_model = QComboBox()
         self.ollama_model.addItems(["qwen2.5:3b", "llama3.2:3b", "llama3.2:1b"])
         self.ollama_model.setCurrentText(OLLAMA_MODEL)
@@ -108,7 +176,6 @@ class SettingsDialog(QDialog):
         self.silence_dur = QLineEdit(str(SILENCE_DURATION))
         self.silence_thresh = QLineEdit(str(SILENCE_THRESHOLD))
         self.sample_rate = QLineEdit(str(SAMPLE_RATE))
-        
         layout3.addRow("Ollama Model:", self.ollama_model)
         layout3.addRow("Ollama URL:", self.ollama_url)
         layout3.addRow("Max Command Length (s):", self.max_cmd_sec)
@@ -116,29 +183,44 @@ class SettingsDialog(QDialog):
         layout3.addRow("Silence Cutoff (s):", self.silence_dur)
         layout3.addRow("Silence Threshold (db):", self.silence_thresh)
         layout3.addRow("Microphone Sample Rate:", self.sample_rate)
-        self.tabs.addTab(tab3, "Advanced")
-
-        layout.addWidget(self.tabs)
+        self.pages.addWidget(page3)
+        
+        # Connect Sidebar to Pages
+        self.sidebar.currentRowChanged.connect(self.pages.setCurrentIndex)
+        
+        # Add to content layout
+        content_layout.addWidget(self.sidebar)
+        
+        # Wrap pages in a layout with a save button at bottom
+        right_panel = QWidget()
+        right_layout = QVBoxLayout(right_panel)
+        right_layout.setContentsMargins(0,0,0,0)
+        right_layout.addWidget(self.pages)
+        
+        right_layout.addStretch()
+        save_btn = QPushButton("Save & Apply")
+        save_btn.setObjectName("SaveBtn")
+        save_btn.clicked.connect(self.save_settings)
+        right_layout.addWidget(save_btn)
+        
+        content_layout.addWidget(right_panel)
+        main_layout.addWidget(content_widget)
 
         self.wake_mode.currentTextChanged.connect(self.toggle_wake)
         self.toggle_wake(self.wake_mode.currentText())
 
-        save_btn = QPushButton("Save Settings & Close")
-        save_btn.clicked.connect(self.save_settings)
-        layout.addWidget(save_btn)
-
     def toggle_wake(self, text):
-        tab2_layout = self.tabs.widget(1).layout()
+        layout = self.pages.widget(1).layout()
         if text == "model":
             self.wake_model.show()
             self.wake_word.hide()
-            tab2_layout.labelForField(self.wake_word).hide()
-            tab2_layout.labelForField(self.wake_model).show()
+            layout.labelForField(self.wake_word).hide()
+            layout.labelForField(self.wake_model).show()
         else:
             self.wake_model.hide()
             self.wake_word.show()
-            tab2_layout.labelForField(self.wake_model).hide()
-            tab2_layout.labelForField(self.wake_word).show()
+            layout.labelForField(self.wake_model).hide()
+            layout.labelForField(self.wake_word).show()
 
     def save_settings(self):
         env_path = os.path.join(os.path.dirname(__file__), '.env')
@@ -146,14 +228,12 @@ class SettingsDialog(QDialog):
             'ASSISTANT_NAME': self.assistant_name.text(),
             'SECURITY_PIN': self.security_pin.text(),
             'HF_TOKEN': self.hf_token.text(),
-            
             'WAKE_MODE': self.wake_mode.currentText(),
             'WAKE_MODEL': self.wake_model.currentText(),
             'WAKE_WORD': self.wake_word.text(),
             'WAKE_THRESHOLD': self.wake_threshold.text(),
             'WHISPER_MODEL_SIZE': self.whisper_model.currentText(),
             'WHISPER_COMPUTE_TYPE': self.whisper_compute.currentText(),
-            
             'OLLAMA_MODEL': self.ollama_model.currentText(),
             'OLLAMA_URL': self.ollama_url.text(),
             'MAX_COMMAND_SECONDS': self.max_cmd_sec.text(),
@@ -180,31 +260,15 @@ class FloatingWidget(QWidget):
         super().__init__()
         self.setWindowFlags(Qt.WindowType.FramelessWindowHint | Qt.WindowType.WindowStaysOnTopHint | Qt.WindowType.Tool)
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
-        self.resize(350, 200)
+        self.resize(350, 250)
 
         self.state = "sleeping"
         self.phase = 0.0
-        self.radius = 40
+        self.current_text = "Sleeping..."
 
         self.timer = QTimer(self)
         self.timer.timeout.connect(self.animate)
-        self.timer.start(50)
-
-        layout = QVBoxLayout(self)
-        layout.setContentsMargins(0, 0, 0, 0)
-        
-        # Spacer for the orb drawing area
-        layout.addSpacing(130)
-
-        self.label = QLabel("Sleeping...")
-        self.label.setFont(QFont("Segoe UI", 12, QFont.Weight.Bold))
-        self.label.setStyleSheet("color: white; background: rgba(30, 30, 40, 0.7); border-radius: 12px; padding: 10px 20px;")
-        self.label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        
-        # Wrap label in a layout to center it
-        hbox = QHBoxLayout()
-        hbox.addWidget(self.label, 0, Qt.AlignmentFlag.AlignCenter)
-        layout.addLayout(hbox)
+        self.timer.start(30) # slightly faster for smooth rotation
 
         # Settings button
         self.btn = QPushButton("⚙ Settings", self)
@@ -220,7 +284,10 @@ class FloatingWidget(QWidget):
         self.btn.hide()
 
         signals.state_changed.connect(self.set_state)
-        signals.text_updated.connect(self.label.setText)
+        signals.text_updated.connect(self.set_text)
+
+    def set_text(self, text):
+        self.current_text = text
 
     def open_settings(self):
         dlg = SettingsDialog(self)
@@ -241,69 +308,81 @@ class FloatingWidget(QWidget):
         self.update()
 
     def animate(self):
-        self.phase += 0.2
-        if self.state == "listening":
-            self.radius = 40 + 8 * math.sin(self.phase)
-        elif self.state == "thinking":
-            self.radius = 40 + 4 * math.sin(self.phase * 2)
-        elif self.state == "speaking":
-            self.radius = 40 + 12 * math.fabs(math.sin(self.phase * 3))
-        else:
-            self.radius = 40
+        self.phase += 0.1
         self.update()
 
     def paintEvent(self, event):
         painter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
         
-        if self.state == "sleeping":
-            base_color = QColor(80, 80, 80, 255)
-            glow_color = QColor(80, 80, 80, 30)
-        elif self.state == "listening":
-            base_color = QColor(0, 136, 255, 255) # Bright cyan/blue
-            glow_color = QColor(0, 136, 255, 60)
-        elif self.state == "thinking":
-            base_color = QColor(148, 0, 211, 255) # Purple
-            glow_color = QColor(148, 0, 211, 60)
+        # Transparent background fill
+        painter.fillRect(self.rect(), QColor(0, 0, 0, 0))
+
+        cx, cy = self.width() // 2, 90
+        base_radius = 45
+
+        # Draw the 3D rotating ring (loaderCircle)
+        painter.save()
+        painter.translate(cx, cy)
+        
+        if self.state == "listening":
+            speed = 8
+            colors = [QColor(56, 189, 248), QColor(0, 93, 255), QColor(30, 64, 175)] # Light blue, bright blue, deep blue
         elif self.state == "speaking":
-            base_color = QColor(255, 0, 128, 255) # Neon pink
-            glow_color = QColor(255, 0, 128, 60)
-            
-        painter.setPen(Qt.PenStyle.NoPen)
-        cx, cy = self.width() // 2, 70
-        
-        # We will draw 7 vertical bars for the waveform
-        num_bars = 7
-        bar_width = 8
-        spacing = 4
-        total_width = num_bars * (bar_width + spacing) - spacing
-        start_x = cx - (total_width // 2)
-        
+            speed = 10
+            colors = [QColor(255, 105, 180), QColor(255, 20, 147), QColor(199, 21, 133)] # Neon pinks
+        elif self.state == "thinking":
+            speed = 6
+            colors = [QColor(216, 191, 216), QColor(148, 0, 211), QColor(75, 0, 130)] # Purples
+        else:
+            speed = 2
+            colors = [QColor(150, 150, 150), QColor(100, 100, 100), QColor(60, 60, 60)] # Grays
+
+        painter.rotate(self.phase * speed * 10)
+
         import math
-        for i in range(num_bars):
-            # Calculate height modulation based on state and phase
+        from PyQt6.QtGui import QPen
+        
+        # We draw 3 arcs with different rotation lengths and thicknesses to simulate the 3D inset box-shadow
+        painter.setBrush(Qt.BrushStyle.NoBrush)
+        for i, c in enumerate(colors):
+            pen = QPen(c)
+            pen.setWidth(4 + i * 3)
+            pen.setCapStyle(Qt.PenCapStyle.RoundCap)
+            c.setAlpha(180 - i * 40)
+            pen.setColor(c)
+            
+            painter.setPen(pen)
+            rect_offset = i * 1.5
+            radius = base_radius - rect_offset
+            # Draw sweeping arcs
+            start_angle = int(16 * (i * 60))
+            span_angle = int(16 * (270 - i * 40))
+            painter.drawArc(int(-radius), int(-radius), int(radius * 2), int(radius * 2), start_angle, span_angle)
+
+        painter.restore()
+
+        # Draw bouncing text (loaderLetter)
+        text = self.current_text
+        painter.setFont(QFont("Segoe UI", 12, QFont.Weight.Bold))
+        text_width = painter.fontMetrics().horizontalAdvance(text)
+        start_x = cx - (text_width // 2)
+        y = cy + base_radius + 40
+        
+        current_x = start_x
+        for i, char in enumerate(text):
+            char_width = painter.fontMetrics().horizontalAdvance(char)
             if self.state == "sleeping":
-                height = 10
+                y_offset = 0
+                opacity = 180
             else:
-                # Math magic to make the waveform ripple beautifully
-                offset = i * 0.5
-                intensity = 15 if self.state == "listening" else (30 if self.state == "speaking" else 20)
-                height = 20 + intensity * math.fabs(math.sin(self.phase * 3 + offset))
-            
-            x = start_x + i * (bar_width + spacing)
-            y = cy - (height / 2)
-            
-            # Draw glow for each bar
-            if self.state != "sleeping":
-                for g in range(3, 0, -1):
-                    painter.setBrush(QBrush(glow_color))
-                    glow_w = bar_width + g * 4
-                    glow_h = height + g * 8
-                    painter.drawRoundedRect(int(x - g * 2), int(y - g * 4), int(glow_w), int(glow_h), 4, 4)
-            
-            # Draw core bar
-            painter.setBrush(QBrush(base_color))
-            painter.drawRoundedRect(int(x), int(y), bar_width, int(height), bar_width // 2, bar_width // 2)
+                wave = math.sin(self.phase * 4 - i * 0.5)
+                y_offset = wave * -4 # subtle bounce up/down
+                opacity = int(255 if wave > 0 else 120)
+
+            painter.setPen(QColor(255, 255, 255, opacity))
+            painter.drawText(int(current_x), int(y + y_offset), char)
+            current_x += char_width
 
     def mousePressEvent(self, event):
         if event.button() == Qt.MouseButton.LeftButton:
