@@ -110,7 +110,7 @@ class SettingsDialog(QDialog):
         # Sidebar
         self.sidebar = QListWidget()
         self.sidebar.setFixedWidth(180)
-        self.sidebar.addItems(["Identity", "Voice Engine", "Advanced Tools"])
+        self.sidebar.addItems(["Identity", "Voice Engine", "Advanced Tools", "Memory"])
         self.sidebar.setCurrentRow(0)
         
         # Stacked Pages
@@ -185,6 +185,34 @@ class SettingsDialog(QDialog):
         layout3.addRow("Microphone Sample Rate:", self.sample_rate)
         self.pages.addWidget(page3)
         
+        # PAGE 4: Memory
+        page4 = QWidget()
+        layout4 = QVBoxLayout(page4)
+        layout4.setSpacing(15)
+        
+        mem_title = QLabel("Memory Management")
+        mem_title.setStyleSheet("font-size: 18px; font-weight: bold; color: white;")
+        layout4.addWidget(mem_title)
+        
+        mem_desc = QLabel("If the AI gets confused or starts hallucinating, you can wipe its memory array to start a fresh conversation. This will NOT delete your settings.")
+        mem_desc.setWordWrap(True)
+        mem_desc.setStyleSheet("color: #94a3b8; font-size: 13px;")
+        layout4.addWidget(mem_desc)
+        
+        layout4.addStretch()
+        
+        self.wipe_mem_btn = QPushButton("Wipe Memory (Start New Session)")
+        self.wipe_mem_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #ef4444; color: white; border-radius: 8px; padding: 12px; font-size: 14px; font-weight: bold;
+            }
+            QPushButton:hover { background-color: #dc2626; }
+        """)
+        self.wipe_mem_btn.clicked.connect(self.wipe_memory)
+        layout4.addWidget(self.wipe_mem_btn)
+        
+        self.pages.addWidget(page4)
+
         # Connect Sidebar to Pages
         self.sidebar.currentRowChanged.connect(self.pages.setCurrentIndex)
         
@@ -223,7 +251,9 @@ class SettingsDialog(QDialog):
             layout.labelForField(self.wake_word).show()
 
     def save_settings(self):
-        env_path = os.path.join(os.path.dirname(__file__), '.env')
+        from config import USER_DATA_DIR
+        import os
+        env_path = os.path.join(USER_DATA_DIR, '.env')
         new_settings = {
             'ASSISTANT_NAME': self.assistant_name.text(),
             'SECURITY_PIN': self.security_pin.text(),
@@ -246,6 +276,16 @@ class SettingsDialog(QDialog):
             if value.strip() != "":
                 dotenv.set_key(env_path, key, value)
         self.accept()
+
+    def wipe_memory(self):
+        from memory import clear_history
+        clear_history()
+        from PyQt6.QtWidgets import QMessageBox
+        msg = QMessageBox(self)
+        msg.setWindowTitle("Memory Wiped")
+        msg.setText("The AI's memory has been completely wiped. You are now starting a fresh session!")
+        msg.setStyleSheet("QLabel{color: white; font-size: 13px;} QMessageBox{background-color: #0f172a; border: 1px solid #38bdf8;}")
+        msg.exec()
 
 class AssistantThread(QThread):
     def run(self):
@@ -278,10 +318,23 @@ class FloatingWidget(QWidget):
             }
             QPushButton:hover { background: rgba(60,60,70,0.9); }
         """)
-        self.btn.move(250, 15)
+        self.btn.move(240, 15)
         self.btn.resize(90, 30)
         self.btn.clicked.connect(self.open_settings)
         self.btn.hide()
+
+        # Exit button
+        self.exit_btn = QPushButton("✖ Exit App", self)
+        self.exit_btn.setStyleSheet("""
+            QPushButton {
+                background: rgba(239,68,68,0.8); color: white; border-radius: 10px; padding: 5px 10px; font-size: 13px; font-weight: bold;
+            }
+            QPushButton:hover { background: rgba(220,38,38,0.9); }
+        """)
+        self.exit_btn.move(140, 15)
+        self.exit_btn.resize(90, 30)
+        self.exit_btn.clicked.connect(self.close_app)
+        self.exit_btn.hide()
 
         signals.state_changed.connect(self.set_state)
         signals.text_updated.connect(self.set_text)
@@ -293,8 +346,14 @@ class FloatingWidget(QWidget):
         dlg = SettingsDialog(self)
         dlg.exec()
 
+    def close_app(self):
+        import os, signal
+        QApplication.quit()
+        os.kill(os.getpid(), signal.SIGTERM)
+
     def enterEvent(self, event):
         self.btn.show()
+        self.exit_btn.show()
 
     def leaveEvent(self, event):
         # Only hide if the mouse actually left the entire window bounds
@@ -302,6 +361,7 @@ class FloatingWidget(QWidget):
         pos = self.mapFromGlobal(QCursor.pos())
         if not self.rect().contains(pos):
             self.btn.hide()
+            self.exit_btn.hide()
 
     def set_state(self, state):
         self.state = state

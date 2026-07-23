@@ -9,16 +9,20 @@ import sys
 
 # ── Base path (works both as plain script and as a PyInstaller .exe) ──
 if getattr(sys, "frozen", False):
-    # Running as a bundled .exe — models/ must sit next to the .exe, not inside it
+    # Running as a bundled .exe
     BASE_DIR = os.path.dirname(sys.executable)
+    # Writable user data (history, settings)
+    USER_DATA_DIR = os.path.join(os.getenv("APPDATA"), "ZazaAssistant")
+    os.makedirs(USER_DATA_DIR, exist_ok=True)
 else:
     BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+    USER_DATA_DIR = BASE_DIR
 
 # ── Hugging Face Authentication (optional for faster downloads) ──
 # We load the token securely from the .env file instead of hardcoding it here.
 try:
     from dotenv import load_dotenv
-    load_dotenv(os.path.join(BASE_DIR, ".env"))
+    load_dotenv(os.path.join(USER_DATA_DIR, ".env"))
 except ImportError:
     pass
 
@@ -101,7 +105,7 @@ CONVERSATION_TIMEOUT = int(os.getenv("CONVERSATION_TIMEOUT", 30))         # seco
 # ── Persistent memory ─────────────────────────────────────
 # Conversation history is saved locally so the assistant remembers past
 # sessions. Fully offline — just a JSON file on your disk.
-MEMORY_DIR = os.path.join(BASE_DIR, "memory")
+MEMORY_DIR = os.path.join(USER_DATA_DIR, "memory")
 MAX_HISTORY = 50                  # keep this many past interactions
 
 # ── Text-to-Speech ────────────────────────────────────────

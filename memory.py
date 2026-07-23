@@ -86,3 +86,13 @@ def get_last_session_info() -> dict:
         }
     except (ValueError, TypeError):
         return {"total_interactions": len(history)}
+
+
+def clear_history():
+    """Wipes the conversation history and resets it to an empty list."""
+    _ensure_dir()
+    try:
+        with open(HISTORY_FILE, "w", encoding="utf-8") as f:
+            json.dump([], f)
+    except IOError:
+        pass
