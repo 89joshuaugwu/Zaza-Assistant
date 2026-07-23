@@ -746,12 +746,26 @@ def empty_recycle_bin(_args=None):
     """Empties the Windows recycle bin."""
     try:
         # SHEmptyRecycleBin(hwnd, path, flags)
-        # flags: 0x07 = SHERB_NOCONFIRMATION | SHERB_NOPROGRESSUI | SHERB_NOSOUND
         ctypes.windll.shell32.SHEmptyRecycleBinW(None, None, 0x07)
         return "Recycle bin emptied."
     except Exception:
         return "Couldn't empty the recycle bin."
 
+
+def get_battery_status(_args=None):
+    """Returns current battery percentage and plug status."""
+    try:
+        import psutil
+        battery = psutil.sensors_battery()
+        if battery is None:
+            return "I couldn't detect a battery. You might be on a desktop computer."
+        
+        percent = int(battery.percent)
+        plugged = "plugged in and charging" if battery.power_plugged else "on battery power"
+        
+        return f"Your battery is at {percent}% and is currently {plugged}."
+    except Exception:
+        return "I encountered an error trying to check the battery."
 
 # ── Registry: maps tool name -> (function, JSON schema for the LLM) ──
 
