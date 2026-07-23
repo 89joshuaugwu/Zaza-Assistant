@@ -396,6 +396,8 @@ def type_text(args: dict):
     """Types text into the currently focused window (or opens an app first).
     Uses clipboard paste for reliability — works with any characters."""
     text = (args or {}).get("text", "").strip()
+    press_enter = (args or {}).get("press_enter", False)
+    
     if not text:
         return "What should I type?"
 
@@ -423,6 +425,7 @@ def type_text(args: dict):
         # Simulate Ctrl+V via Windows keybd_event
         VK_CONTROL = 0x11
         VK_V = 0x56
+        VK_RETURN = 0x0D
         KEYEVENTF_KEYUP = 0x0002
 
         ctypes.windll.user32.keybd_event(VK_CONTROL, 0, 0, 0)
@@ -431,15 +434,89 @@ def type_text(args: dict):
         ctypes.windll.user32.keybd_event(VK_V, 0, KEYEVENTF_KEYUP, 0)
         ctypes.windll.user32.keybd_event(VK_CONTROL, 0, KEYEVENTF_KEYUP, 0)
 
+        time.sleep(0.1)
+        
+        if press_enter:
+            ctypes.windll.user32.keybd_event(VK_RETURN, 0, 0, 0)
+            time.sleep(0.05)
+            ctypes.windll.user32.keybd_event(VK_RETURN, 0, KEYEVENTF_KEYUP, 0)
+
         time.sleep(0.3)
         try:
             pyperclip.copy(old_clipboard)  # restore clipboard
         except Exception:
             pass
 
-        return "Done — typed the text."
+        return "Done — typed the text." + (" (And pressed Enter)" if press_enter else "")
     except Exception:
         return "Couldn't type the text. Make sure the target window is focused."
+
+
+def send_message(args: dict):
+    """Automates opening a chat app, searching for a contact, and sending a message."""
+    app = (args or {}).get("app_name", "whatsapp").strip().lower()
+    contact = (args or {}).get("contact_name", "").strip()
+    message = (args or {}).get("message", "").strip()
+
+    if not contact or not message:
+        return "I need a contact name and a message to send."
+
+    # 1. Open the app and wait for it to load
+    open_application({"app_name": app})
+    import time
+    time.sleep(2.5) 
+
+    try:
+        import pyperclip
+        VK_CONTROL = 0x11
+        VK_F = 0x46
+        VK_K = 0x4B
+        VK_RETURN = 0x0D
+        VK_V = 0x56
+        KEYEVENTF_KEYUP = 0x0002
+
+        def press_key(vk):
+            ctypes.windll.user32.keybd_event(vk, 0, 0, 0)
+            time.sleep(0.05)
+            ctypes.windll.user32.keybd_event(vk, 0, KEYEVENTF_KEYUP, 0)
+
+        def paste_text(t):
+            old = ""
+            try: old = pyperclip.paste()
+            except: pass
+            pyperclip.copy(t)
+            time.sleep(0.1)
+            ctypes.windll.user32.keybd_event(VK_CONTROL, 0, 0, 0)
+            press_key(VK_V)
+            ctypes.windll.user32.keybd_event(VK_CONTROL, 0, KEYEVENTF_KEYUP, 0)
+            time.sleep(0.2)
+            try: pyperclip.copy(old)
+            except: pass
+
+        # 2. Trigger the search bar
+        ctypes.windll.user32.keybd_event(VK_CONTROL, 0, 0, 0)
+        if "discord" in app:
+            press_key(VK_K) # Discord quick switcher
+        else:
+            press_key(VK_F) # WhatsApp / Telegram search
+        ctypes.windll.user32.keybd_event(VK_CONTROL, 0, KEYEVENTF_KEYUP, 0)
+        time.sleep(0.6)
+
+        # 3. Type contact name and wait for search results
+        paste_text(contact)
+        time.sleep(1.5)
+
+        # 4. Hit Enter to select the contact
+        press_key(VK_RETURN)
+        time.sleep(0.6)
+
+        # 5. Type the message and hit Enter to send
+        paste_text(message)
+        press_key(VK_RETURN)
+
+        return f"Successfully sent the message to {contact} on {app}."
+    except Exception as e:
+        return f"Failed to send the message: {e}"
 
 
 def lock_screen(_args=None):
@@ -734,14 +811,28 @@ TOOLS = {
     },
     "type_text": {
         "func": type_text,
-        "description": "Type text into the currently focused application window. Can optionally open an app first (e.g. notepad) then type into it. Use this when the user says 'write ... in notepad', 'type ... in word', etc.",
+        "description": "Type text into the currently focused application window. Can optionally open an app first (e.g. notepad, whatsapp) then type into it. Use this when the user says 'write ... in notepad', 'send a message on whatsapp', etc. Can press Enter after typing if requested.",
         "parameters": {
             "type": "object",
             "properties": {
                 "text": {"type": "string", "description": "The text to type"},
-                "app_name": {"type": "string", "description": "Optional: app to open first before typing (e.g. notepad, word)"},
+                "app_name": {"type": "string", "description": "Optional: app to open first before typing (e.g. notepad, word, whatsapp)"},
+                "press_enter": {"type": "boolean", "description": "If true, simulates pressing the Enter key after typing (e.g. to send a message)"},
             },
             "required": ["text"],
+        },
+    },
+    "send_message": {
+        "func": send_message,
+        "description": "Send a direct message to a specific contact on chat apps like WhatsApp, Discord, or Telegram. Automates opening the app, searching the contact, typing, and sending.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "app_name": {"type": "string", "description": "The chat app to use (e.g. whatsapp, discord, telegram)"},
+                "contact_name": {"type": "string", "description": "The name of the person or group to message"},
+                "message": {"type": "string", "description": "The message to send"},
+            },
+            "required": ["app_name", "contact_name", "message"],
         },
     },
     "lock_screen": {

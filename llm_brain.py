@@ -153,14 +153,26 @@ def think(user_text: str) -> str:
 
     if not tool_calls:
         reply = message.get("content", "").strip()
-        if not reply:
-            reply = "I didn't quite catch that."
-            speak(reply)
-        # Save to both in-session and persistent memory
-        _history.append({"role": "user", "content": user_text})
-        _history.append({"role": "assistant", "content": reply})
-        save_interaction(user_text, reply)
-        return reply
+        
+        # Fallback for models (like qwen or llama) that output raw JSON instead of using native tool calls
+        if reply.startswith("{") and reply.endswith("}"):
+            import json
+            try:
+                parsed = json.loads(reply)
+                if "name" in parsed and "parameters" in parsed:
+                    tool_calls = [{"function": {"name": parsed["name"], "arguments": parsed["parameters"]}}]
+            except Exception:
+                pass
+
+        if not tool_calls:
+            if not reply:
+                reply = "I didn't quite catch that."
+                speak(reply)
+            # Save to both in-session and persistent memory
+            _history.append({"role": "user", "content": user_text})
+            _history.append({"role": "assistant", "content": reply})
+            save_interaction(user_text, reply)
+            return reply
 
     # Execute each tool call the model requested, then let it summarize
     messages.append(message)
@@ -173,6 +185,19 @@ def think(user_text: str) -> str:
                 args = json.loads(args)
             except json.JSONDecodeError:
                 args = {}
+                
+        # Auto-correct hallucinated tool names like "open_notepad" -> "open_application"
+        if name.startswith("open_") and name not in ["open_application", "open_folder", "open_file", "open_website"]:
+            app_name = name.replace("open_", "")
+            name = "open_application"
+            if isinstance(args, dict):
+                args["app_name"] = app_name
+                
+        if name.startswith("close_") and name not in ["close_application", "close_active_window"]:
+            app_name = name.replace("close_", "")
+            name = "close_application"
+            if isinstance(args, dict):
+                args["app_name"] = app_name
 
         result = execute_tool(name, args)
         messages.append({

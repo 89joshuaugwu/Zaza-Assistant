@@ -257,34 +257,53 @@ class FloatingWidget(QWidget):
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
         
         if self.state == "sleeping":
-            base_color = QColor(100, 100, 100, 150)
-            glow_color = QColor(100, 100, 100, 40)
+            base_color = QColor(80, 80, 80, 255)
+            glow_color = QColor(80, 80, 80, 30)
         elif self.state == "listening":
-            base_color = QColor(0, 255, 255, 255)
-            glow_color = QColor(0, 200, 255, 100)
+            base_color = QColor(0, 136, 255, 255) # Bright cyan/blue
+            glow_color = QColor(0, 136, 255, 60)
         elif self.state == "thinking":
-            base_color = QColor(180, 50, 255, 255)
-            glow_color = QColor(148, 0, 211, 100)
+            base_color = QColor(148, 0, 211, 255) # Purple
+            glow_color = QColor(148, 0, 211, 60)
         elif self.state == "speaking":
-            base_color = QColor(255, 50, 150, 255)
-            glow_color = QColor(255, 0, 128, 100)
+            base_color = QColor(255, 0, 128, 255) # Neon pink
+            glow_color = QColor(255, 0, 128, 60)
             
-        from PyQt6.QtGui import QRadialGradient
+        painter.setPen(Qt.PenStyle.NoPen)
         cx, cy = self.width() // 2, 70
         
-        # Create a beautiful glowing gradient
-        gradient = QRadialGradient(cx, cy, self.radius * 1.5)
-        gradient.setColorAt(0.0, QColor(255, 255, 255, 255)) # Bright core
-        gradient.setColorAt(0.3, base_color)                 # Main color
-        gradient.setColorAt(0.8, glow_color)                 # Soft glow
-        gradient.setColorAt(1.0, QColor(0, 0, 0, 0))         # Fade to transparent
+        # We will draw 7 vertical bars for the waveform
+        num_bars = 7
+        bar_width = 8
+        spacing = 4
+        total_width = num_bars * (bar_width + spacing) - spacing
+        start_x = cx - (total_width // 2)
         
-        painter.setBrush(QBrush(gradient))
-        painter.setPen(Qt.PenStyle.NoPen)
-        
-        # Draw a slightly larger ellipse to accommodate the glow
-        glow_radius = int(self.radius * 1.5)
-        painter.drawEllipse(cx - glow_radius, cy - glow_radius, glow_radius * 2, glow_radius * 2)
+        import math
+        for i in range(num_bars):
+            # Calculate height modulation based on state and phase
+            if self.state == "sleeping":
+                height = 10
+            else:
+                # Math magic to make the waveform ripple beautifully
+                offset = i * 0.5
+                intensity = 15 if self.state == "listening" else (30 if self.state == "speaking" else 20)
+                height = 20 + intensity * math.fabs(math.sin(self.phase * 3 + offset))
+            
+            x = start_x + i * (bar_width + spacing)
+            y = cy - (height / 2)
+            
+            # Draw glow for each bar
+            if self.state != "sleeping":
+                for g in range(3, 0, -1):
+                    painter.setBrush(QBrush(glow_color))
+                    glow_w = bar_width + g * 4
+                    glow_h = height + g * 8
+                    painter.drawRoundedRect(int(x - g * 2), int(y - g * 4), int(glow_w), int(glow_h), 4, 4)
+            
+            # Draw core bar
+            painter.setBrush(QBrush(base_color))
+            painter.drawRoundedRect(int(x), int(y), bar_width, int(height), bar_width // 2, bar_width // 2)
 
     def mousePressEvent(self, event):
         if event.button() == Qt.MouseButton.LeftButton:
